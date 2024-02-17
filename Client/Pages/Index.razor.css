@@ -1,0 +1,22 @@
+﻿html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: #1C1B22;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrolling */
+    height: 100%; /* Ensure full viewport height */
+}
+
+.simulation-container {
+    overflow: hidden; /* Prevent scrolling within the container */
+}
+
+.canvas-container {
+    position: relative;
+    width: 100%; /* Full width */
+}
+
+#threejs-canvas {
+    width: 100%; /* Full width */
+    height: 100%; /* Adjust canvas height to fill its container */
+}
