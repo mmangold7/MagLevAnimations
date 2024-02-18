@@ -1,20 +1,25 @@
-﻿import * as three from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 var scene, camera, renderer, controls;
 
 function initializeThreeJs(dimensions) {
-    scene = new three.Scene();
+    scene = new THREE.Scene();
+    //scene.background = new THREE.Color(0xbbbbbb);
 
-    camera = new three.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1, 2);
-    camera.lookAt(new three.Vector3(0, 0, 0));
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    scene.add(new THREE.AmbientLight(0xffffff, 10));
+    const light = new THREE.PointLight(0xffffff, 10, 0, 0);
+    light.position.copy(camera.position);
+    scene.add(light);
 
     const canvasContainer = document.querySelector('.canvas-container');
     const canvas = document.getElementById('threejs-canvas');
 
-    renderer = new three.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.setClearColor(0xffffff, 1);
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
 
     setupOrbitControls(dimensions);
@@ -25,7 +30,7 @@ function initializeThreeJs(dimensions) {
 
 function setupOrbitControls(dimensions) {
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; // Optional: enable damping (inertia)
+    controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
     controls.maxPolarAngle = Math.PI / 2;
@@ -35,14 +40,14 @@ function setupOrbitControls(dimensions) {
 }
 
 function addBoundingBox(dimensions) {
-    const geometry = new three.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
-    const edges = new three.EdgesGeometry(geometry);
-    const line = new three.LineSegments(edges, new three.LineBasicMaterial({ color: 0x0000ff }));
+    const geometry = new THREE.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
     line.position.set(0, 0, 0);
     line.name = "boundingBox";
     scene.add(line);
 
-    const gridHelper = new three.GridHelper(dimensions.width, 10);
+    const gridHelper = new THREE.GridHelper(dimensions.width, 10);
     gridHelper.position.y = -(dimensions.height / 2);
     scene.add(gridHelper);
 }
@@ -53,7 +58,7 @@ function resetCameraToBoundingBox(dimensions) {
     const cameraZ = Math.abs(maxDimension / 2 * Math.tan(fov / 2) * 2);
     camera.position.z = cameraZ;
 
-    const center = new three.Vector3(0, 0, 0);
+    const center = new THREE.Vector3(0, 0, 0);
     controls.target = center;
     controls.update();
 }
@@ -84,8 +89,8 @@ function resizeRendererToDisplaySize(renderer) {
     return needResize;
 }
 
-function updateThreeJsScene(magnets, showLoops) {
-    clearMagnets();
+function updateThreeJsScene(magnets, showLoops, gravityField, magneticField) {
+    clearMagnetsAndFields();
 
     const magnetsArray = Array.isArray(magnets) ? magnets : [magnets];
 
@@ -96,12 +101,20 @@ function updateThreeJsScene(magnets, showLoops) {
             createCylinderMagnet(magnet);
         }
     });
+
+    if (gravityField) {
+        drawFieldVectors(gravityField, 0x00ff00); // Green for gravity
+    }
+
+    if (magneticField) {
+        drawFieldVectors(magneticField, 0xff0000); // Red for magnetic
+    }
 }
 
-function clearMagnets() {
+function clearMagnetsAndFields() {
     const toRemove = [];
     scene.traverse((child) => {
-        if (child.name === "magnetObject") {
+        if (child.name === "magnetObject" || child.name === "arrowObject") {
             toRemove.push(child);
         }
     });
@@ -110,21 +123,40 @@ function clearMagnets() {
     });
 }
 
+function drawFieldVectors(fieldData, color) {
+    fieldData.forEach(vector => {
+        const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
+        const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+        const arrowLength = vector.magnitude; // Adjust based on your scale
+
+        const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, color);
+        arrowHelper.name = "arrowObject";
+        scene.add(arrowHelper);
+    });
+}
+
 function createCylinderMagnet(magnet) {
-    const geometry = new three.CylinderGeometry(magnet.radius, magnet.radius, magnet.length, 32);
-    const material = new three.MeshBasicMaterial({
-        color: 0xff0000,
+    const geometry = new THREE.CylinderGeometry(magnet.radius, magnet.radius, magnet.length, 32);
+    const neodymiumMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0.99,
+        roughness: 0.0,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        sheen: 0.5,
+        transmission: 0.2,
+        thickness: 0.5,
     });
 
-    const cylinder = new three.Mesh(geometry, material);
+    const cylinder = new THREE.Mesh(geometry, neodymiumMaterial);
     cylinder.name = "magnetObject";
 
     cylinder.position.set(magnet.position.x, magnet.position.y, magnet.position.z);
 
-    const axis = new three.Vector3(0, 1, 0);
-    const desiredOrientation = new three.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
+    const axis = new THREE.Vector3(0, 1, 0);
+    const desiredOrientation = new THREE.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
     const angle = Math.acos(axis.dot(desiredOrientation));
-    const rotationAxis = new three.Vector3().crossVectors(axis, desiredOrientation).normalize();
+    const rotationAxis = new THREE.Vector3().crossVectors(axis, desiredOrientation).normalize();
     cylinder.setRotationFromAxisAngle(rotationAxis, angle);
 
     scene.add(cylinder);
@@ -136,20 +168,29 @@ function createLoopsMagnet(magnet) {
     const loopRadius = magnet.radius;
     const segmentHeight = magnet.length / segments;
 
+    const enamelMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xc54c12,
+        metalness: 0.8,
+        roughness: 0.0,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        sheen: 0.5,
+        transmission: 0.2,
+        thickness: 0.5,
+        //reflectivity 
+    });
+
     for (let i = 0; i < segments; i++) {
-        const loopGeometry = new three.TorusGeometry(loopRadius, 0.005, 16, 100);
-        const loopMaterial = new three.MeshBasicMaterial({
-            color: 0x0000ff,
-        });
-        const loop = new three.Mesh(loopGeometry, loopMaterial);
+        const loopGeometry = new THREE.TorusGeometry(loopRadius, 0.005, 16, 100);
+        const loop = new THREE.Mesh(loopGeometry, enamelMaterial);
         loop.name = "magnetObject";
 
         loop.position.set(magnet.position.x, magnet.position.y - magnet.length / 2 + segmentHeight * i + segmentHeight / 2, magnet.position.z);
 
-        const axis = new three.Vector3(0, 0, 1);
-        const desiredOrientation = new three.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
+        const axis = new THREE.Vector3(0, 0, 1);
+        const desiredOrientation = new THREE.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
         const angle = Math.acos(axis.dot(desiredOrientation));
-        const rotationAxis = new three.Vector3().crossVectors(axis, desiredOrientation).normalize();
+        const rotationAxis = new THREE.Vector3().crossVectors(axis, desiredOrientation).normalize();
         loop.setRotationFromAxisAngle(rotationAxis, angle);
 
         scene.add(loop);

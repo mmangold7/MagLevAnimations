@@ -5,6 +5,10 @@
 <div>
     <button @onclick="ToggleSimulation">@(_isSimulationRunning ? "Pause Simulation" : "Start Simulation")</button>
     <button @onclick="ToggleVisualizationMode">@(_showCoils ? "Show Cylinders" : "Show Coils")</button>
+    <input type="number" @bind="_divisions" />
+    <button @onclick="ToggleGravityField">@(_showGravityField ? "Hide Gravity Field" : "Show Gravity Field")</button>
+    <button @onclick="ToggleMagneticField">@(_showMagneticField ? "Hide Magnetic Field" : "Show Magnetic Field")</button>
+
 </div>
 <div class="canvas-container">
     <canvas id="threejs-canvas"></canvas>

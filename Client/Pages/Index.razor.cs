@@ -12,27 +12,30 @@ public partial class Index : ComponentBase
     protected IJSRuntime? JsRuntime { get; set; }
     private SimulationManager? _simulationManager;
     private bool _showCoils;
-    private bool _isSimulationRunning = false;
+    private bool _isSimulationRunning;
+    private int _divisions = 10;
+    private bool _showGravityField;
+    private bool _showMagneticField;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _simulationManager = new SimulationManager();
+
+            _simulationManager.InitializeTwoMagnets();
             await InitializeVisualization(_simulationManager.SimulationExtents);
             await UpdateVisualization();
         }
     }
 
-    private async Task InitializeVisualization(Vector3 extents)
-    {
+    private async Task InitializeVisualization(Vector3 extents) =>
         await JsRuntime.InvokeVoidAsync("Animations.initializeThreeJs", new
         {
             width = extents.X,
             height = extents.Y,
             depth = extents.Z
         });
-    }
 
     private async Task ToggleSimulation()
     {
@@ -47,7 +50,6 @@ public partial class Index : ComponentBase
                 await Task.Delay(100);
             }
         }
-        // If _isSimulationRunning is false, the loop exits, effectively pausing the simulation
     }
 
     private async Task ToggleVisualizationMode()
@@ -56,25 +58,40 @@ public partial class Index : ComponentBase
         await UpdateVisualization();
     }
 
+    private async Task ToggleGravityField()
+    {
+        _showGravityField = !_showGravityField;
+        if (_showGravityField) _simulationManager.CalculateGravityField(_divisions);
+        await UpdateVisualization();
+    }
+
+    private async Task ToggleMagneticField()
+    {
+        _showMagneticField = !_showMagneticField;
+        if (_showMagneticField) _simulationManager.CalculateMagneticField(_divisions);
+        await UpdateVisualization();
+    }
+
     private async Task UpdateVisualization()
     {
-        var magnets = new[] {
-            ConvertMagnetToJsObject(_simulationManager.TargetMagnet),
-            ConvertMagnetToJsObject(_simulationManager.FixedMagnet)
-        };
-
-        await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", magnets, _showCoils);
+        var magnets = _simulationManager.Magnets.Select(ConvertMagnetToJsObject).ToArray();
+        var gravityField = _showGravityField ? _simulationManager.GravityFieldVectors.Select(ConvertFieldToJsObject).ToArray() : null;
+        var magneticField = _showMagneticField ? _simulationManager.MagneticFieldVectors.Select(ConvertFieldToJsObject).ToArray() : null;
+        await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", magnets, _showCoils, gravityField, magneticField);
     }
 
-    private object ConvertMagnetToJsObject(Magnet magnet)
+    private object ConvertMagnetToJsObject(Magnet magnet) => new
     {
-        return new
-        {
-            position = new { magnet.Position.X, magnet.Position.Y, magnet.Position.Z },
-            radius = magnet.Radius,
-            length = magnet.Length,
-            magnetization = new { magnet.Magnetization.X, magnet.Magnetization.Y, magnet.Magnetization.Z}
-            //color = 0xff0000
-        };
-    }
+        position = new { magnet.Position.X, magnet.Position.Y, magnet.Position.Z },
+        radius = magnet.Radius,
+        length = magnet.Length,
+        magnetization = new { magnet.Magnetization.X, magnet.Magnetization.Y, magnet.Magnetization.Z, },
+    };
+
+    private object ConvertFieldToJsObject(FieldVector vector) => new
+    {
+        position = new { vector.Position.X, vector.Position.Y, vector.Position.Z },
+        direction = new { vector.Direction.X, vector.Direction.Y, vector.Direction.Z },
+        magnitude = vector.Magnitude,
+    };
 }
