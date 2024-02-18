@@ -16,6 +16,13 @@ function initializeThreeJs(dimensions) {
     light.position.copy(camera.position);
     scene.add(light);
 
+    const axesHelper = new THREE.AxesHelper(1);
+
+    axesHelper.position.set(dimensions.width / 2, -dimensions.height / 2, dimensions.depth / 2);
+
+    // Add the AxesHelper to the scene
+    scene.add(axesHelper);
+
     const canvasContainer = document.querySelector('.canvas-container');
     const canvas = document.getElementById('threejs-canvas');
 
@@ -97,8 +104,10 @@ function updateThreeJsScene(magnets, showLoops, gravityField, magneticField) {
     magnetsArray.forEach(magnet => {
         if (showLoops) {
             createLoopsMagnet(magnet);
+            addMagnetOrientationIndicator(magnet);
         } else {
             createCylinderMagnet(magnet);
+            addMagnetOrientationIndicator(magnet);
         }
     });
 
@@ -195,6 +204,17 @@ function createLoopsMagnet(magnet) {
 
         scene.add(loop);
     }
+}
+
+function addMagnetOrientationIndicator(magnet) {
+    // Assuming 'magnet' is an object with properties 'position' and 'magnetization'
+    var dir = new THREE.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
+    var origin = new THREE.Vector3(magnet.position.x, magnet.position.y, magnet.position.z);
+    var length = 0.2; // Length of the arrow
+    var hex = 0xffff00; // Color of the arrow
+
+    var arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
+    scene.add(arrowHelper);
 }
 
 export { updateThreeJsScene, initializeThreeJs };

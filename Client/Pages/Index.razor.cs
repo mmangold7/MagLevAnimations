@@ -14,8 +14,10 @@ public partial class Index : ComponentBase
     private bool _showCoils;
     private bool _isSimulationRunning;
     private int _divisions = 10;
+    private int _voxelsPerDivisions = 10;
     private bool _showGravityField;
     private bool _showMagneticField;
+    private bool _userDipoleApproximation = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -69,6 +71,17 @@ public partial class Index : ComponentBase
     {
         _showMagneticField = !_showMagneticField;
         if (_showMagneticField) _simulationManager.CalculateMagneticField(_divisions);
+        await UpdateVisualization();
+    }
+
+    private async Task ToggleApproximation()
+    {
+        _userDipoleApproximation = !_userDipoleApproximation;
+
+        _simulationManager?.SwitchApproximationTo(_userDipoleApproximation
+            ? SimulationMode.DipoleApproximation
+            : SimulationMode.VoxelBased, _divisions, _voxelsPerDivisions);
+
         await UpdateVisualization();
     }
 
