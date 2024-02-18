@@ -214,6 +214,7 @@ function addMagnetOrientationIndicator(magnet) {
     var hex = 0xffff00; // Color of the arrow
 
     var arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
+    arrowHelper.name = "arrowObject";
     scene.add(arrowHelper);
 }
 

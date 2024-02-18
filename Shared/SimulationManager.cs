@@ -4,34 +4,46 @@ namespace Animations.Shared;
 
 public class SimulationManager
 {
+    private readonly float _timeStep = 0.01f;
+    private readonly Vector3 _gravity = new(0, -9.81f, 0);
+
     public SimulationMode CurrentMode { get; set; } = SimulationMode.DipoleApproximation;
     public List<Magnet> Magnets { get; set; } = new();
     public List<FieldVector> GravityFieldVectors { get; set; } = new();
     public List<FieldVector> MagneticFieldVectors { get; set; } = new();
-    private readonly float _timeStep = 0.01f;
-    private Vector3 _gravity = new(0, -9.81f, 0);
     public Vector3 SimulationExtents { get; set; } = new(1.0f, 1.0f, 1.0f);
+    public bool ShowGravityField { get; set; }
+    public int Divisions { get; set; }
+    public bool ShowMagneticField { get; set; }
 
     public void SwitchApproximationTo(SimulationMode newMode, int divisions = 10, int voxelsPerDivision = 10)
     {
         CurrentMode = newMode;
 
-        if (newMode == SimulationMode.VoxelBased)
+        switch (newMode)
         {
-            float divisionLength = SimulationExtents.X / divisions;
-            float voxelLength = divisionLength / voxelsPerDivision;
-
-            foreach (var magnet in Magnets)
+            case SimulationMode.VoxelBased:
             {
-                GenerateVoxelsForMagnet(magnet, voxelLength);
+                var divisionLength = SimulationExtents.X / divisions;
+                var voxelLength = divisionLength / voxelsPerDivision;
+
+                foreach (var magnet in Magnets)
+                    GenerateVoxelsForMagnet(magnet, voxelLength);
+                break;
+            }
+            case SimulationMode.DipoleApproximation:
+            {
+                foreach (var magnet in Magnets)
+                    magnet.Voxels.Clear();
+                break;
             }
         }
     }
 
     private void GenerateVoxelsForMagnet(Magnet magnet, float voxelLength)
     {
-        int voxelsPerDimension = (int)Math.Round(magnet.Length / voxelLength);
-        Vector3 voxelMagneticMoment = magnet.Magnetization / (voxelsPerDimension * voxelsPerDimension * voxelsPerDimension);
+        var voxelsPerDimension = (int)Math.Round(magnet.Length / voxelLength);
+        var voxelMagneticMoment = magnet.Magnetization / (voxelsPerDimension * voxelsPerDimension * voxelsPerDimension);
 
         for (int x = 0; x < voxelsPerDimension; x++)
         {
@@ -39,7 +51,7 @@ public class SimulationManager
             {
                 for (int z = 0; z < voxelsPerDimension; z++)
                 {
-                    Vector3 voxelPosition = new Vector3(
+                    var voxelPosition = new Vector3(
                         magnet.Position.X + (x + 0.5f) * voxelLength - magnet.Length / 2,
                         magnet.Position.Y + (y + 0.5f) * voxelLength - magnet.Length / 2,
                         magnet.Position.Z + (z + 0.5f) * voxelLength - magnet.Length / 2);
@@ -59,62 +71,66 @@ public class SimulationManager
     {
         if (!Magnets.Any()) return;
 
-        if (CurrentMode == SimulationMode.DipoleApproximation)
+        switch (CurrentMode)
         {
-            foreach (var target in Magnets.Where(m => !m.IsFixed))
+            case SimulationMode.DipoleApproximation:
             {
-                Vector3 totalForce = Vector3.Zero;
-
-                foreach (var source in Magnets.Where(m => m != target))
-                {
-                    Vector3 forceFromSource = CalculateDipoleDipoleForce(target, source);
-                    totalForce += forceFromSource;
-                }
-
-                target.Position += totalForce / target.Mass * _timeStep;
+                UpdateMagnetPositionsUsingDipoleApproximation();
+                break;
+            }
+            case SimulationMode.VoxelBased:
+            {
+                UpdateMagnetsUsingVoxelApproximation();
+                break;
             }
         }
-        else if (CurrentMode == SimulationMode.VoxelBased)
-        {
-            foreach (var targetMagnet in Magnets.Where(m => !m.IsFixed))
-            {
-                Vector3 totalForce = Vector3.Zero;
 
-                foreach (var sourceMagnet in Magnets.Where(m => m != targetMagnet))
+        if (ShowGravityField) CalculateGravityField();
+        if (ShowMagneticField) CalculateMagneticField();
+    }
+
+    private void UpdateMagnetsUsingVoxelApproximation()
+    {
+        foreach (var targetMagnet in Magnets.Where(m => !m.IsFixed))
+        {
+            Vector3 totalForce = Vector3.Zero;
+
+            foreach (var sourceMagnet in Magnets.Where(m => m != targetMagnet))
+            {
+                foreach (var targetVoxel in targetMagnet.Voxels)
                 {
-                    foreach (var targetVoxel in targetMagnet.Voxels)
+                    Vector3 voxelForce = Vector3.Zero;
+
+                    foreach (var sourceVoxel in sourceMagnet.Voxels)
                     {
-                        Vector3 voxelForce = Vector3.Zero;
-
-                        foreach (var sourceVoxel in sourceMagnet.Voxels)
-                        {
-                            voxelForce += CalculateDipoleDipoleForce(targetVoxel, sourceVoxel);
-                        }
-
-                        totalForce += voxelForce;
+                        voxelForce += CalculateDipoleDipoleForce(targetVoxel, sourceVoxel);
                     }
+
+                    totalForce += voxelForce;
                 }
-
-                targetMagnet.Position += totalForce * _timeStep / targetMagnet.Mass;
             }
+
+            Vector3 gravityForce = _gravity * targetMagnet.Mass;
+            totalForce += gravityForce;
+            targetMagnet.Position += totalForce * _timeStep / targetMagnet.Mass;
         }
+    }
 
-        var levitationTargets = Magnets.Where(m => !m.IsFixed);
-
-        foreach (var target in levitationTargets)
+    private void UpdateMagnetPositionsUsingDipoleApproximation()
+    {
+        foreach (var target in Magnets.Where(m => !m.IsFixed))
         {
-            Vector3 totalMagneticForce = Vector3.Zero;
+            Vector3 totalForce = Vector3.Zero;
 
-            foreach (var magnet in Magnets.Where(m => m != target))
+            foreach (var source in Magnets.Where(m => m != target))
             {
-                Vector3 magneticFieldAtTarget = CalculateFieldAtPoint(magnet, target.Position);
-                Vector3 magneticForce = magneticFieldAtTarget * target.Magnetization.Length();
-                totalMagneticForce += magneticForce;
+                Vector3 forceFromSource = CalculateDipoleDipoleForce(target, source);
+                totalForce += forceFromSource;
             }
 
             Vector3 gravityForce = _gravity * target.Mass;
-            Vector3 totalForce = totalMagneticForce + gravityForce;
-            target.Position += totalForce * _timeStep;
+            totalForce += gravityForce;
+            target.Position += totalForce / target.Mass * _timeStep;
         }
     }
 
@@ -204,42 +220,42 @@ public class SimulationManager
         return field;
     }
 
-    public void CalculateGravityField(int divisions)
+    public void CalculateGravityField()
     {
         GravityFieldVectors.Clear();
         Vector3 gravityDirection = Vector3.Normalize(_gravity);
-        float divisionLength = SimulationExtents.X / divisions;
+        float divisionLength = SimulationExtents.X / Divisions;
         float gravityMagnitude = Math.Min(9.81f, divisionLength);
 
-        for (int x = 0; x < divisions; x++)
+        for (int x = 0; x < Divisions; x++)
         {
-            for (int y = 0; y < divisions; y++)
+            for (int y = 0; y < Divisions; y++)
             {
-                for (int z = 0; z < divisions; z++)
+                for (int z = 0; z < Divisions; z++)
                 {
-                    Vector3 position = CalculatePositionInSpace(x, y, z, divisions);
+                    Vector3 position = CalculatePositionInSpace(x, y, z, Divisions);
                     GravityFieldVectors.Add(new FieldVector(position, Vector3.Normalize(gravityDirection), gravityMagnitude));
                 }
             }
         }
     }
 
-    public void CalculateMagneticField(int divisions)
+    public void CalculateMagneticField()
     {
         MagneticFieldVectors.Clear();
-        float divisionLength = SimulationExtents.X / divisions;
+        float divisionLength = SimulationExtents.X / Divisions;
         float maxMagnitude = 0f;
         float minMagnitude = float.MaxValue;
 
         List<FieldVector> tempVectors = new List<FieldVector>();
 
-        for (int x = 0; x < divisions; x++)
+        for (int x = 0; x < Divisions; x++)
         {
-            for (int y = 0; y < divisions; y++)
+            for (int y = 0; y < Divisions; y++)
             {
-                for (int z = 0; z < divisions; z++)
+                for (int z = 0; z < Divisions; z++)
                 {
-                    Vector3 position = CalculatePositionInSpace(x, y, z, divisions);
+                    Vector3 position = CalculatePositionInSpace(x, y, z, Divisions);
                     Vector3 totalMagneticField = Vector3.Zero;
 
                     foreach (var magnet in Magnets)
@@ -296,14 +312,14 @@ public class SimulationManager
         float fixedMagnetMass = 1f;
 
         Vector3 targetPosition = new Vector3(0, baseHeight + stabilizingMagnetHeight / 2 + gap, 0);
-        var levitatingMagnet = new Magnet(targetPosition, new Vector3(0, -1, 0), 0.05f, stabilizingMagnetHeight, 1.0f,
+        var levitatingMagnet = new Magnet(targetPosition, new Vector3(0, 1, 0), 0.05f, stabilizingMagnetHeight, 1.0f,
             stabilizingMagnetMass, MagnetType.Permanent, false);
 
         Vector3 fixedPosition = new Vector3(0, targetPosition.Y + stabilizingMagnetHeight / 2 + fixedMagnetHeight / 2 + gap, 0);
-        var stabilizingMagnet = new Magnet(fixedPosition, new Vector3(0, -1, 0), 0.05f, fixedMagnetHeight, 1.0f, fixedMagnetMass,
+        var stabilizingMagnet = new Magnet(fixedPosition, new Vector3(0, 1, 0), 0.05f, fixedMagnetHeight, 1.0f, fixedMagnetMass,
             MagnetType.Permanent, true);
 
         AddMagnet(levitatingMagnet);
-        //AddMagnet(stabilizingMagnet);
+        AddMagnet(stabilizingMagnet);
     }
 }

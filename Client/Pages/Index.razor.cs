@@ -63,14 +63,18 @@ public partial class Index : ComponentBase
     private async Task ToggleGravityField()
     {
         _showGravityField = !_showGravityField;
-        if (_showGravityField) _simulationManager.CalculateGravityField(_divisions);
+        _simulationManager.ShowGravityField = _showGravityField;
+        _simulationManager.Divisions = _divisions;
+        if(_showGravityField) _simulationManager.CalculateGravityField();
         await UpdateVisualization();
     }
 
     private async Task ToggleMagneticField()
     {
         _showMagneticField = !_showMagneticField;
-        if (_showMagneticField) _simulationManager.CalculateMagneticField(_divisions);
+        _simulationManager.ShowMagneticField = _showMagneticField;
+        _simulationManager.Divisions = _divisions;
+        if (_showMagneticField) _simulationManager.CalculateMagneticField();
         await UpdateVisualization();
     }
 
