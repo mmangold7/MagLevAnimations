@@ -2,11 +2,10 @@
 
 <PageTitle>Magnet Simulator</PageTitle>
 
-<div class="simulation-container">
-    <div class="canvas-container">
-        <canvas id="threejs-canvas"></canvas>
-    </div>
+<div>
+    <button @onclick="ToggleSimulation">@(_isSimulationRunning ? "Pause Simulation" : "Start Simulation")</button>
+    <button @onclick="ToggleVisualizationMode">@(_showCoils ? "Show Cylinders" : "Show Coils")</button>
 </div>
-
-<button @onclick="StartSimulation">Start Simulation</button>
-<button @onclick="ToggleVisualization">Toggle Visualization</button>
+<div class="canvas-container">
+    <canvas id="threejs-canvas"></canvas>
+</div>

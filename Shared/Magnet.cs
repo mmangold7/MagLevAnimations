@@ -1,20 +1,24 @@
 using System.Numerics;
 
+namespace Animations.Shared;
+
 public class Magnet
 {
-    public Vector3 Position { get; set; } // Center position of the magnet
+    public Vector3 Position { get; set; } // Center of the magnet
     public Vector3 Magnetization { get; set; } // Direction and magnitude of magnetization
     public float Radius { get; set; }
     public float Length { get; set; }
     public float Current { get; set; } // Equivalent current for magnetization
+    public float Mass { get; set; } // Mass of the magnet
 
-    public Magnet(Vector3 position, Vector3 magnetization, float radius, float length, float current)
+    public Magnet(Vector3 position, Vector3 magnetization, float radius, float length, float current, float mass)
     {
         Position = position;
         Magnetization = magnetization;
         Radius = radius;
         Length = length;
         Current = current;
+        Mass = mass; // Initialize mass
     }
 
     // Calculate the magnetic field at a point due to this cylindrical magnet

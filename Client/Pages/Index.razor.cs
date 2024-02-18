@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Numerics;
+using Animations.Shared;
 
 namespace Animations.Client.Pages;
 
@@ -7,44 +9,72 @@ public partial class Index : ComponentBase
 {
 
     [Inject]
-    protected IJSRuntime JSRuntime { get; set; }
+    protected IJSRuntime? JsRuntime { get; set; }
+    private SimulationManager? _simulationManager;
+    private bool _showCoils;
+    private bool _isSimulationRunning = false;
 
-    private SimulationManager simulationManager;
-    private bool showLoops = false; // Controls the visualization mode
-
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        simulationManager = new SimulationManager();
-        await UpdateVisualization(); // Initial visualization
-    }
-
-    private async Task StartSimulation()
-    {
-        for (int i = 0; i < 1000; i++)
+        if (firstRender)
         {
-            simulationManager.UpdateSimulation();
+            _simulationManager = new SimulationManager();
+            await InitializeVisualization(_simulationManager.SimulationExtents);
             await UpdateVisualization();
-            await Task.Delay(100);
         }
     }
 
-    private async Task ToggleVisualization()
+    private async Task InitializeVisualization(Vector3 extents)
     {
-        showLoops = !showLoops;
+        await JsRuntime.InvokeVoidAsync("Animations.initializeThreeJs", new
+        {
+            width = extents.X,
+            height = extents.Y,
+            depth = extents.Z
+        });
+    }
+
+    private async Task ToggleSimulation()
+    {
+        _isSimulationRunning = !_isSimulationRunning;
+
+        if (_isSimulationRunning)
+        {
+            for (int i = 0; _isSimulationRunning && i < 1000; i++)
+            {
+                _simulationManager.UpdateSimulation();
+                await UpdateVisualization();
+                await Task.Delay(100);
+            }
+        }
+        // If _isSimulationRunning is false, the loop exits, effectively pausing the simulation
+    }
+
+    private async Task ToggleVisualizationMode()
+    {
+        _showCoils = !_showCoils;
         await UpdateVisualization();
     }
 
     private async Task UpdateVisualization()
     {
-        // Convert Magnet properties to a format suitable for JS interop
-        var magnetInfo = new
-        {
-            position = new { simulationManager.TargetMagnet.Position.X, simulationManager.TargetMagnet.Position.Y, simulationManager.TargetMagnet.Position.Z },
-            radius = simulationManager.TargetMagnet.Radius,
-            length = simulationManager.TargetMagnet.Length,
-            color = 0xff0000 // Example color, adjust as needed
+        var magnets = new[] {
+            ConvertMagnetToJsObject(_simulationManager.TargetMagnet),
+            ConvertMagnetToJsObject(_simulationManager.FixedMagnet)
         };
 
-        await JSRuntime.InvokeVoidAsync("updateVisualization", magnetInfo, showLoops);
+        await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", magnets, _showCoils);
+    }
+
+    private object ConvertMagnetToJsObject(Magnet magnet)
+    {
+        return new
+        {
+            position = new { magnet.Position.X, magnet.Position.Y, magnet.Position.Z },
+            radius = magnet.Radius,
+            length = magnet.Length,
+            magnetization = new { magnet.Magnetization.X, magnet.Magnetization.Y, magnet.Magnetization.Z}
+            //color = 0xff0000
+        };
     }
 }

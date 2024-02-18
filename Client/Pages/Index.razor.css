@@ -3,20 +3,22 @@
     background-color: #1C1B22;
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Prevent scrolling */
-    height: 100%; /* Ensure full viewport height */
+    overflow: hidden;
+    height: 100%;
 }
-
-.simulation-container {
-    overflow: hidden; /* Prevent scrolling within the container */
-}
-
 .canvas-container {
-    position: relative;
-    width: 100%; /* Full width */
+    position: absolute;
+    top: 50px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid #ccc;
 }
 
-#threejs-canvas {
-    width: 100%; /* Full width */
-    height: 100%; /* Adjust canvas height to fill its container */
+canvas {
+    flex-grow: 1;
+    background-color: white;
 }

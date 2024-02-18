@@ -1,4 +1,4 @@
-﻿import { initializeThreeJs, updateThreeJsScene } from './index';
+﻿import { updateThreeJsScene, initializeThreeJs } from './index';
 
 window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) {
@@ -8,6 +8,5 @@ window.addEventListener('load', () => {
 });
 
 window.Animations = {
-    initializeThreeJs,
-    updateThreeJsScene
+    updateThreeJsScene, initializeThreeJs
 };
