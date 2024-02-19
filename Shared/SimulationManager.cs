@@ -11,7 +11,7 @@ public class SimulationManager
     public List<Magnet> Magnets { get; set; } = new();
     public List<FieldVector> GravityFieldVectors { get; set; } = new();
     public List<FieldVector> MagneticFieldVectors { get; set; } = new();
-    public Vector3 SimulationExtents { get; set; } = new(1.0f, 1.0f, 1.0f);
+    public Vector3 SimulationExtents { get; set; } = new(10f, 10f, 10f);
     public bool ShowGravityField { get; set; }
     public int Divisions { get; set; }
     public bool ShowMagneticField { get; set; }
@@ -303,20 +303,20 @@ public class SimulationManager
     public void InitializeTwoMagnets()
     {
         float baseHeight = -(SimulationExtents.Y / 4.0f);
-        float gap = 0.1f;
+        float gap = 1f;
 
-        float stabilizingMagnetHeight = 0.1f;
-        float fixedMagnetHeight = 0.1f;
+        float stabilizingMagnetHeight = 1f;
+        float fixedMagnetHeight = 1f;
 
-        float stabilizingMagnetMass = 1f;
-        float fixedMagnetMass = 1f;
+        float stabilizingMagnetMass = .01f;
+        float fixedMagnetMass = .01f;
 
         Vector3 targetPosition = new Vector3(0, baseHeight + stabilizingMagnetHeight / 2 + gap, 0);
-        var levitatingMagnet = new Magnet(targetPosition, new Vector3(0, 1, 0), 0.05f, stabilizingMagnetHeight, 1.0f,
+        var levitatingMagnet = new Magnet(targetPosition, new Vector3(0, 1, 0), stabilizingMagnetHeight / 2, stabilizingMagnetHeight, 1.0f,
             stabilizingMagnetMass, MagnetType.Permanent, false);
 
         Vector3 fixedPosition = new Vector3(0, targetPosition.Y + stabilizingMagnetHeight / 2 + fixedMagnetHeight / 2 + gap, 0);
-        var stabilizingMagnet = new Magnet(fixedPosition, new Vector3(0, 1, 0), 0.05f, fixedMagnetHeight, 1.0f, fixedMagnetMass,
+        var stabilizingMagnet = new Magnet(fixedPosition, new Vector3(0, 1, 0), fixedMagnetHeight / 2, fixedMagnetHeight, 1.0f, fixedMagnetMass,
             MagnetType.Permanent, true);
 
         AddMagnet(levitatingMagnet);

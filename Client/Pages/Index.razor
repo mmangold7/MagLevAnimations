@@ -3,13 +3,13 @@
 <PageTitle>Magnet Simulator</PageTitle>
 
 <div>
-    <button @onclick="ToggleSimulation">@(_isSimulationRunning ? "Pause Simulation" : "Start Simulation")</button>
+    <button @onclick="ToggleSimulation">@(!Paused ? "Pause Simulation" : "Start Simulation")</button>
     <button @onclick="ToggleVisualizationMode">@(_showCoils ? "Show Cylinders" : "Show Coils")</button>
     <input type="number" @bind="_divisions" />
     <button @onclick="ToggleGravityField">@(_showGravityField ? "Hide Gravity Field" : "Show Gravity Field")</button>
     <button @onclick="ToggleMagneticField">@(_showMagneticField ? "Hide Magnetic Field" : "Show Magnetic Field")</button>
     <input type="number" @bind="_voxelsPerDivisions" />
-    <button @onclick="ToggleApproximation">@(_userDipoleApproximation ? "Use Magnetized Voxels" : "Use Dipoles")</button>
+    <button @onclick="ToggleApproximation">@(_useDipoleApproximation ? "Use Magnetized Voxels" : "Use Dipoles")</button>
 
 </div>
 <div class="canvas-container">

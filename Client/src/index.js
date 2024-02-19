@@ -189,7 +189,7 @@ function createLoopsMagnet(magnet) {
     });
 
     for (let i = 0; i < segments; i++) {
-        const loopGeometry = new THREE.TorusGeometry(loopRadius, 0.005, 16, 100);
+        const loopGeometry = new THREE.TorusGeometry(loopRadius, magnet.length / segments / 2, 16, 100);
         const loop = new THREE.Mesh(loopGeometry, enamelMaterial);
         loop.name = "magnetObject";
 
@@ -208,7 +208,7 @@ function createLoopsMagnet(magnet) {
 function addMagnetOrientationIndicator(magnet) {
     var dir = new THREE.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
     var origin = new THREE.Vector3(magnet.position.x, magnet.position.y, magnet.position.z);
-    var length = 0.2;
+    var length = 1.0;
     var hex = 0xffff00;
 
     var arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
