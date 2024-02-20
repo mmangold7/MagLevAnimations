@@ -76,10 +76,8 @@ public class SimulationManager
         Magnets.Add(magnet);
     }
 
-    public void UpdateSimulation()
+    public SimulationState UpdateSimulation()
     {
-        if (!Magnets.Any()) return;
-
         switch (CurrentMode)
         {
             case SimulationMode.DipoleApproximation:
@@ -96,7 +94,35 @@ public class SimulationManager
         
         if (ShowGravityField) Profiling.RunWithClockingLog(CalculateGravityField);
         if (ShowMagneticField) Profiling.RunWithClockingLog(CalculateMagneticField);
+
+        return GetSimulationState();
     }
+
+    public SimulationState GetSimulationState()
+    {
+        return new SimulationState
+        {
+            Magnets = Magnets.Select(ConvertMagnetToJsObject).ToArray(),
+            GravityFieldData = GravityFieldVectors.Select(ConvertFieldToJsObject).ToArray(),
+            MagneticFieldData = MagneticFieldVectors.Select(ConvertFieldToJsObject).ToArray()
+        };
+    }
+
+    private object ConvertMagnetToJsObject(Magnet magnet) => new
+    {
+        position = new { magnet.Position.X, magnet.Position.Y, magnet.Position.Z },
+        radius = magnet.Radius,
+        length = magnet.Length,
+        magnetization = new { magnet.Magnetization.X, magnet.Magnetization.Y, magnet.Magnetization.Z, },
+    };
+
+    private object ConvertFieldToJsObject(FieldVector vector) => new
+    {
+        position = new { vector.Position.X, vector.Position.Y, vector.Position.Z },
+        direction = new { vector.Direction.X, vector.Direction.Y, vector.Direction.Z },
+        magnitude = vector.Magnitude,
+        index = vector.Index
+    };
 
     private void UpdateMagnetsUsingVoxelApproximation()
     {
@@ -240,7 +266,8 @@ public class SimulationManager
                 for (int z = 0; z < Divisions; z++)
                 {
                     Vector3 position = CalculatePositionInSpace(x, y, z, Divisions);
-                    GravityFieldVectors.Add(new FieldVector(position, Vector3.Normalize(gravityDirection), gravityMagnitude));
+                    var flatIndex = x * _simulationExtents.Y * _simulationExtents.Z + y * _simulationExtents.Z + z;
+                    GravityFieldVectors.Add(new FieldVector(position, Vector3.Normalize(gravityDirection), gravityMagnitude, (int)flatIndex));
                 }
             }
         }
@@ -274,7 +301,8 @@ public class SimulationManager
                     maxMagnitude = Math.Max(maxMagnitude, magnitude);
                     minMagnitude = Math.Min(minMagnitude, magnitude);
 
-                    tempVectors.Add(new FieldVector(position, totalMagneticField, magnitude));
+                    var flatIndex = x * _simulationExtents.Y * _simulationExtents.Z + y * _simulationExtents.Z + z;
+                    tempVectors.Add(new FieldVector(position, totalMagneticField, magnitude, (int)flatIndex));
                 }
             }
         }
@@ -284,7 +312,7 @@ public class SimulationManager
             float scaledMagnitude = ScaleMagnitude(vector.Magnitude, minMagnitude, maxMagnitude, divisionLength * 0.1f, divisionLength);
             Vector3 normalizedDirection = Vector3.Normalize(vector.Direction) * scaledMagnitude;
 
-            MagneticFieldVectors.Add(new FieldVector(vector.Position, normalizedDirection, scaledMagnitude));
+            MagneticFieldVectors.Add(new FieldVector(vector.Position, normalizedDirection, scaledMagnitude, vector.Index));
         }
     }
 

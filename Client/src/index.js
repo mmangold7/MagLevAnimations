@@ -139,13 +139,13 @@ function clearMagnetsAndFields() {
 function drawFieldVectors(fieldData, color, fieldDrawMethod) {
     switch (fieldDrawMethod) {
         case 'arrows':
-            fieldData.forEach(vector => {
+            fieldData.forEach((vector) => {
                 const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
                 const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
                 const arrowLength = vector.magnitude;
 
                 const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, color);
-                arrowHelper.name = "arrowObject";
+                arrowHelper.name = `arrowObject-${vector.index}`;
                 scene.add(arrowHelper);
             });
             break;

@@ -44,7 +44,8 @@ public partial class Index : ComponentBase
     {
         CancelSimulation();
         _simulationManager = await ResetSimulator(_simLoopCancel.Token);
-        await SendCurrentStateToClientVisualization();
+        var currentState = _simulationManager.GetSimulationState();
+        await SendCurrentStateToClientVisualization(currentState);
         await InvokeAsync(StateHasChanged);
         await StartDrawSimulationLoop(_simulationManager, _simLoopCancel.Token);
     }
@@ -91,8 +92,8 @@ public partial class Index : ComponentBase
             else
                 await Task.Run(async () =>
                 {
-                    simulationManager.UpdateSimulation();
-                    await SendCurrentStateToClientVisualization();
+                    var newState = simulationManager.UpdateSimulation();
+                    await SendCurrentStateToClientVisualization(newState);
                     await DelayUntilNextRequestedFrame(simLoopCancelToken);
                 }, simLoopCancelToken);
         }
@@ -125,43 +126,19 @@ public partial class Index : ComponentBase
         _isVisualizationInitialized = true;
     }
 
-    private async Task SendCurrentStateToClientVisualization()
+    private async Task SendCurrentStateToClientVisualization(SimulationState state)
     {
         if (_isVisualizationInitialized && _simulationManager is { Magnets.Count: > 0 })
         {
+            //var stopwatch = Stopwatch.StartNew();
+            //var (magnets, gravityField, magneticField) = MapMagnetsToJs();
+            //stopwatch.Stop();
+            //Profiling.LogMethodTime("MapMagnetsToJs", stopwatch.ElapsedMilliseconds);
+
+
             var stopwatch = Stopwatch.StartNew();
-            var (magnets, gravityField, magneticField) = MapMagnetsToJs();
-            stopwatch.Stop();
-            Profiling.LogMethodTime("MapMagnetsToJs", stopwatch.ElapsedMilliseconds);
-
-
-            //public List<object> GetProbability(float[] probabilityData, bool onlySignificantlyChanged = false)
-            //{
-            //    var updatedData = new List<object>();
-            //    var maxProbability = 1.0f;
-            //    var updateThreshold = maxProbability * 0.1f;
-            //    var opacityScale = 0.75f;
-
-            //    for (int i = 0; i < probabilityData.Length; i++)
-            //    {
-            //        var newProbability = probabilityData[i];
-            //        if (!onlySignificantlyChanged || Math.Abs(newProbability - _previousProbabilityData[i]) > updateThreshold)
-            //        {
-            //            var color = GraphicsExtensions.InterpolateColor(newProbability);
-            //            var opacity = GraphicsExtensions.SigmoidOpacity(newProbability * opacityScale);
-            //            updatedData.Add(new { index = i, color, opacity });
-            //            _previousProbabilityData[i] = newProbability;
-            //        }
-            //    }
-
-            //    return updatedData;
-            //}
-
-
-
-            stopwatch = Stopwatch.StartNew();
             await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene",
-                magnets, ShowCoils, gravityField, magneticField, FieldDrawingType);
+                state.Magnets, ShowCoils, state.GravityFieldData, state.MagneticFieldData, FieldDrawingType);
             stopwatch.Stop();
             Profiling.LogMethodTime("JsRuntime.InvokeVoidAsync(Animations.updateThreeJsScene", stopwatch.ElapsedMilliseconds);
 
@@ -172,35 +149,6 @@ public partial class Index : ComponentBase
         stopwatch2.Stop();
         Profiling.LogMethodTime("InvokeAsync(StateHasChanged)", stopwatch2.ElapsedMilliseconds);
     }
-
-    private (object[] magnets, object[]? gravityField, object[]? magneticField) MapMagnetsToJs()
-    {
-        var magnets = _simulationManager.Magnets.Select(ConvertMagnetToJsObject).ToArray();
-
-        var gravityField = ShowGravityField
-            ? _simulationManager.GravityFieldVectors.Select(ConvertFieldToJsObject).ToArray()
-            : null;
-
-        var magneticField = ShowMagneticField
-            ? _simulationManager.MagneticFieldVectors.Select(ConvertFieldToJsObject).ToArray()
-            : null;
-        return (magnets, gravityField, magneticField);
-    }
-
-    private object ConvertMagnetToJsObject(Magnet magnet) => new
-    {
-        position = new { magnet.Position.X, magnet.Position.Y, magnet.Position.Z },
-        radius = magnet.Radius,
-        length = magnet.Length,
-        magnetization = new { magnet.Magnetization.X, magnet.Magnetization.Y, magnet.Magnetization.Z, },
-    };
-
-    private object ConvertFieldToJsObject(FieldVector vector) => new
-    {
-        position = new { vector.Position.X, vector.Position.Y, vector.Position.Z },
-        direction = new { vector.Direction.X, vector.Direction.Y, vector.Direction.Z },
-        magnitude = vector.Magnitude,
-    };
 
     private async Task InstallApp()
     {
@@ -213,7 +161,8 @@ public partial class Index : ComponentBase
     private async Task ToggleVisualizationMode()
     {
         ShowCoils = !ShowCoils;
-        if (Paused) await SendCurrentStateToClientVisualization();
+        var currentState = _simulationManager.GetSimulationState();
+        if (Paused) await SendCurrentStateToClientVisualization(currentState);
     }
 
     private async Task ToggleGravityField()
@@ -222,7 +171,8 @@ public partial class Index : ComponentBase
         _simulationManager.ShowGravityField = ShowGravityField;
         _simulationManager.Divisions = Divisions;
         if (ShowGravityField) _simulationManager.CalculateGravityField();
-        if (Paused) await SendCurrentStateToClientVisualization();
+        var currentState = _simulationManager.GetSimulationState();
+        if (Paused) await SendCurrentStateToClientVisualization(currentState);
     }
 
     private async Task ToggleMagneticField()
@@ -231,7 +181,8 @@ public partial class Index : ComponentBase
         _simulationManager.ShowMagneticField = ShowMagneticField;
         _simulationManager.Divisions = Divisions;
         if (ShowMagneticField) _simulationManager.CalculateMagneticField();
-        if (Paused) await SendCurrentStateToClientVisualization();
+        var currentState = _simulationManager.GetSimulationState();
+        if (Paused) await SendCurrentStateToClientVisualization(currentState);
     }
 
     private async Task ToggleApproximation()
@@ -242,7 +193,8 @@ public partial class Index : ComponentBase
             ? SimulationMode.DipoleApproximation
             : SimulationMode.VoxelBased, Divisions, VoxelsPerDivision);
 
-        await SendCurrentStateToClientVisualization();
+        var currentState = _simulationManager.GetSimulationState();
+        await SendCurrentStateToClientVisualization(currentState);
     }
 
     private void TogglePaused() => Paused = !Paused;
