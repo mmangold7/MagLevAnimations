@@ -1,20 +1,19 @@
 ﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-var scene, camera, renderer, controls, fieldDrawMethod;
+var scene, camera, renderer, controls;
 
 function initializeThreeJs(dimensions) {
-    //const canvasContainer = document.querySelector('.canvas-container');
     const canvas = document.getElementById('threejs-canvas');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
 
-    document.getElementById('visualizationDropdown').addEventListener('change', function () {
-        const selectedVisualization = this.value;
-        updateVisualizationMethod(selectedVisualization);
-    });
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 
     scene = new THREE.Scene();
-    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    //renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+
     setupLightsAndCamera();
     setupOrbitControls();
     addBoundingBox(dimensions);
@@ -101,7 +100,7 @@ function resizeRendererToDisplaySize(renderer) {
     return needResize;
 }
 
-function updateThreeJsScene(magnets, showLoops, gravityField, magneticField) {
+function updateThreeJsScene(magnets, showLoops, gravityField, magneticField, fieldDrawMethod) {
     clearMagnetsAndFields();
 
     const magnetsArray = Array.isArray(magnets) ? magnets : [magnets];
@@ -117,11 +116,11 @@ function updateThreeJsScene(magnets, showLoops, gravityField, magneticField) {
     });
 
     if (gravityField) {
-        drawFieldVectors(gravityField, 0x00ff00);
+        drawFieldVectors(gravityField, 0x00ff00, fieldDrawMethod);
     }
 
     if (magneticField) {
-        drawFieldVectors(magneticField, 0xff0000);
+        drawFieldVectors(magneticField, 0xff0000, fieldDrawMethod);
     }
 }
 
@@ -137,7 +136,7 @@ function clearMagnetsAndFields() {
     });
 }
 
-function drawFieldVectors(fieldData, color) {
+function drawFieldVectors(fieldData, color, fieldDrawMethod) {
     switch (fieldDrawMethod) {
         case 'arrows':
             fieldData.forEach(vector => {
@@ -175,6 +174,7 @@ function drawFieldVectors(fieldData, color) {
 
                 geometry.setDrawRange(0, maxPoints);
                 const line = new THREE.Line(geometry, lineMaterial);
+                line.name = "arrowObject";
                 scene.add(line);
             });
             break;
@@ -267,12 +267,6 @@ function createLoopsMagnet(magnet) {
 
         scene.add(loop);
     }
-}
-
-function updateVisualizationMethod(method) {
-    //clear Existing Visualization;
-    fieldDrawMethod = method;
-    //trigger redraw
 }
 
 function addMagnetOrientationIndicator(magnet) {

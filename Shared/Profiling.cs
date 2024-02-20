@@ -92,6 +92,6 @@ public static class Profiling
         return $"{type.FullName}.{methodInfo.Name}";
     }
 
-    private static void LogMethodTime(string methodName, long elapsedMilliseconds) =>
+    public static void LogMethodTime(string methodName, long elapsedMilliseconds) =>
         Console.WriteLine($"{methodName} took: {elapsedMilliseconds} ms");
 }

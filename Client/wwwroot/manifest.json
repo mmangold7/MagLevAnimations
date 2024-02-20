@@ -1,6 +1,6 @@
 {
-  "name": "Quantum Particle in a Box Simulator",
-  "short_name": "QuantumBox",
+  "name": "Magnet Simulator",
+  "short_name": "MagLevSim",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#000000",

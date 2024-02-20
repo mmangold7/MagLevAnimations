@@ -1,7 +1,7 @@
 const version = '1.0.2';
 const cacheBuster = '?v=' + version;
 
-const cacheName = 'quantum-box-cache-v' + version;
+const cacheName = 'maglevsim-cache-v' + version;
 const assetsToCache = [
     './' + cacheBuster,  // Alias for 'index.html'
     'css/bootstrap/bootstrap.min.css' + cacheBuster,
