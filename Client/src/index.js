@@ -1,14 +1,20 @@
 ﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-var scene, camera, renderer, controls;
+var scene, camera, renderer, controls, fieldDrawMethod;
 
 function initializeThreeJs(dimensions) {
-    const canvasContainer = document.querySelector('.canvas-container');
+    //const canvasContainer = document.querySelector('.canvas-container');
     const canvas = document.getElementById('threejs-canvas');
+
+    document.getElementById('visualizationDropdown').addEventListener('change', function () {
+        const selectedVisualization = this.value;
+        updateVisualizationMethod(selectedVisualization);
+    });
+
     scene = new THREE.Scene();
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-    renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+    //renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
     setupLightsAndCamera();
     setupOrbitControls();
     addBoundingBox(dimensions);
@@ -132,15 +138,73 @@ function clearMagnetsAndFields() {
 }
 
 function drawFieldVectors(fieldData, color) {
-    fieldData.forEach(vector => {
-        const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
-        const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
-        const arrowLength = vector.magnitude;
+    switch (fieldDrawMethod) {
+        case 'arrows':
+            fieldData.forEach(vector => {
+                const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
+                const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+                const arrowLength = vector.magnitude;
 
-        const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, color);
-        arrowHelper.name = "arrowObject";
-        scene.add(arrowHelper);
-    });
+                const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, color);
+                arrowHelper.name = "arrowObject";
+                scene.add(arrowHelper);
+            });
+            break;
+
+        case 'fieldLines': {
+            // Now inside a block, so const declarations are scoped to this block
+            const lineMaterial = new THREE.LineBasicMaterial({ color: color });
+            const maxPoints = 100; // Maximum points in a line
+            const stepSize = 0.01; // How far each step moves
+
+            fieldData.forEach(vector => {
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(maxPoints * 3); // 3 vertices per point
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                let currentPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+                for (let i = 0; i < maxPoints; i++) {
+                    positions[i * 3] = currentPosition.x;
+                    positions[i * 3 + 1] = currentPosition.y;
+                    positions[i * 3 + 2] = currentPosition.z;
+
+                    // Move the point along the field direction
+                    const fieldDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
+                    currentPosition.addScaledVector(fieldDirection, stepSize);
+                }
+
+                geometry.setDrawRange(0, maxPoints);
+                const line = new THREE.Line(geometry, lineMaterial);
+                scene.add(line);
+            });
+            break;
+        }
+
+        case 'colorMapping':
+            fieldData.forEach(vector => {
+                const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
+                const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+                const arrowLength = vector.magnitude;
+
+                // Map the magnitude to a color
+                const magnitudeNormalized = Math.min(vector.magnitude, 1); // Assuming '1' is max magnitude for normalization
+                const colorScale = new THREE.Color().setHSL(0.7 * (1 - magnitudeNormalized), 1, 0.5); // HSL: hue is adjusted by magnitude
+
+                const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, colorScale);
+                arrowHelper.name = "arrowObject";
+                scene.add(arrowHelper);
+            });
+            break;
+
+        case 'volumeRendering':
+            // Placeholder for volume rendering visualization
+            console.log("Volume rendering is not implemented yet.");
+            break;
+
+        default:
+            console.warn("Unknown field draw method:", fieldDrawMethod);
+            break;
+    }
 }
 
 function createCylinderMagnet(magnet) {
@@ -203,6 +267,12 @@ function createLoopsMagnet(magnet) {
 
         scene.add(loop);
     }
+}
+
+function updateVisualizationMethod(method) {
+    //clear Existing Visualization;
+    fieldDrawMethod = method;
+    //trigger redraw
 }
 
 function addMagnetOrientationIndicator(magnet) {

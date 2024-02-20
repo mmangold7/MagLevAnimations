@@ -4,38 +4,47 @@ namespace Animations.Shared;
 
 public class SimulationManager
 {
-    private readonly float _timeStep = 0.01f;
-    private readonly Vector3 _gravity = new(0, -9.81f, 0);
+    private readonly float _timeStep;
+    private readonly Vector3 _gravity;
+    private readonly Vector3 _simulationExtents;
+
+    public SimulationManager(float timeStep, Vector3 gravity, Vector3 simulationExtents)
+    {
+        _timeStep = timeStep;
+        _gravity = gravity;
+        _simulationExtents = simulationExtents;
+    }
 
     public SimulationMode CurrentMode { get; set; } = SimulationMode.DipoleApproximation;
     public List<Magnet> Magnets { get; set; } = new();
     public List<FieldVector> GravityFieldVectors { get; set; } = new();
     public List<FieldVector> MagneticFieldVectors { get; set; } = new();
-    public Vector3 SimulationExtents { get; set; } = new(10f, 10f, 10f);
     public bool ShowGravityField { get; set; }
     public int Divisions { get; set; }
     public bool ShowMagneticField { get; set; }
 
     public void SwitchApproximationTo(SimulationMode newMode, int divisions = 10, int voxelsPerDivision = 10)
     {
-        CurrentMode = newMode;
-
-        switch (newMode)
+        if (CurrentMode != newMode)
         {
-            case SimulationMode.VoxelBased:
+            CurrentMode = newMode;
+            switch (newMode)
             {
-                var divisionLength = SimulationExtents.X / divisions;
-                var voxelLength = divisionLength / voxelsPerDivision;
+                case SimulationMode.VoxelBased:
+                {
+                    var divisionLength = _simulationExtents.X / divisions;
+                    var voxelLength = divisionLength / voxelsPerDivision;
 
-                foreach (var magnet in Magnets)
-                    GenerateVoxelsForMagnet(magnet, voxelLength);
-                break;
-            }
-            case SimulationMode.DipoleApproximation:
-            {
-                foreach (var magnet in Magnets)
-                    magnet.Voxels.Clear();
-                break;
+                    foreach (var magnet in Magnets)
+                        GenerateVoxelsForMagnet(magnet, voxelLength);
+                    break;
+                }
+                case SimulationMode.DipoleApproximation:
+                {
+                    foreach (var magnet in Magnets)
+                        magnet.Voxels.Clear();
+                    break;
+                }
             }
         }
     }
@@ -75,18 +84,18 @@ public class SimulationManager
         {
             case SimulationMode.DipoleApproximation:
             {
-                UpdateMagnetPositionsUsingDipoleApproximation();
+                Profiling.RunWithClockingLog(UpdateMagnetPositionsUsingDipoleApproximation);
                 break;
             }
             case SimulationMode.VoxelBased:
             {
-                UpdateMagnetsUsingVoxelApproximation();
+                Profiling.RunWithClockingLog(UpdateMagnetsUsingVoxelApproximation);
                 break;
             }
         }
-
-        if (ShowGravityField) CalculateGravityField();
-        if (ShowMagneticField) CalculateMagneticField();
+        
+        if (ShowGravityField) Profiling.RunWithClockingLog(CalculateGravityField);
+        if (ShowMagneticField) Profiling.RunWithClockingLog(CalculateMagneticField);
     }
 
     private void UpdateMagnetsUsingVoxelApproximation()
@@ -180,26 +189,24 @@ public class SimulationManager
     {
         Vector3 totalField = Vector3.Zero;
 
-        if (CurrentMode == SimulationMode.DipoleApproximation)
+        switch (CurrentMode)
         {
-            Vector3 r = point - sourceMagnet.Position;
-            float mu0 = 4 * (float)Math.PI * 1e-7f;
-            float m = sourceMagnet.Magnetization.Length();
-            float rMagnitude = r.Length();
-
-            if (rMagnitude == 0) return Vector3.Zero;
-
-            totalField = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
-                         (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r - sourceMagnet.Magnetization * rMagnitude * rMagnitude);
-        }
-        else if (CurrentMode == SimulationMode.VoxelBased)
-        {
-            foreach (var voxel in sourceMagnet.Voxels)
+            case SimulationMode.DipoleApproximation:
             {
-                float sliceCenterZ = voxel.Position.Z;
-                Vector3 sliceCenter = new Vector3(voxel.Position.X, voxel.Position.Y, sliceCenterZ);
-                totalField += CalculateFieldFromVoxel(voxel, point);
+                Vector3 r = point - sourceMagnet.Position;
+                float mu0 = 4 * (float)Math.PI * 1e-7f;
+                float rMagnitude = r.Length();
+
+                if (rMagnitude == 0) return Vector3.Zero;
+
+                totalField = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+                             (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r - sourceMagnet.Magnetization * rMagnitude * rMagnitude);
+                break;
             }
+            case SimulationMode.VoxelBased:
+                totalField = sourceMagnet.Voxels.Aggregate(totalField, (current, voxel) =>
+                    current + CalculateFieldFromVoxel(voxel, point));
+                break;
         }
 
         return totalField;
@@ -209,7 +216,6 @@ public class SimulationManager
     {
         Vector3 r = point - voxel.Position;
         float mu0 = 4 * (float)Math.PI * 1e-7f;
-        float m = voxel.Magnetization.Length() * voxel.Volume;
         float rMagnitude = r.Length();
 
         if (rMagnitude == 0) return Vector3.Zero;
@@ -224,7 +230,7 @@ public class SimulationManager
     {
         GravityFieldVectors.Clear();
         Vector3 gravityDirection = Vector3.Normalize(_gravity);
-        float divisionLength = SimulationExtents.X / Divisions;
+        float divisionLength = _simulationExtents.X / Divisions;
         float gravityMagnitude = Math.Min(9.81f, divisionLength);
 
         for (int x = 0; x < Divisions; x++)
@@ -243,7 +249,7 @@ public class SimulationManager
     public void CalculateMagneticField()
     {
         MagneticFieldVectors.Clear();
-        float divisionLength = SimulationExtents.X / Divisions;
+        float divisionLength = _simulationExtents.X / Divisions;
         float maxMagnitude = 0f;
         float minMagnitude = float.MaxValue;
 
@@ -290,19 +296,19 @@ public class SimulationManager
 
     private Vector3 CalculatePositionInSpace(int x, int y, int z, int divisions)
     {
-        float stepSize = SimulationExtents.X / divisions;
+        float stepSize = _simulationExtents.X / divisions;
         float offset = stepSize / 2.0f;
 
         return new Vector3(
-            (x * stepSize + offset) - (SimulationExtents.X / 2.0f),
-            (y * stepSize + offset) - (SimulationExtents.Y / 2.0f),
-            (z * stepSize + offset) - (SimulationExtents.Z / 2.0f)
+            (x * stepSize + offset) - (_simulationExtents.X / 2.0f),
+            (y * stepSize + offset) - (_simulationExtents.Y / 2.0f),
+            (z * stepSize + offset) - (_simulationExtents.Z / 2.0f)
         );
     }
 
     public void InitializeTwoMagnets()
     {
-        float baseHeight = -(SimulationExtents.Y / 4.0f);
+        float baseHeight = -(_simulationExtents.Y / 4.0f);
         float gap = 1f;
 
         float stabilizingMagnetHeight = 1f;

@@ -1,4 +1,4 @@
-﻿html, body {
+﻿/*html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background-color: #1C1B22;
     margin: 0;
@@ -21,4 +21,132 @@
 canvas {
     flex-grow: 1;
     background-color: white;
+}*/
+
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: #1C1B22;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.simulation-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.overlay-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: white;
+    padding: 10px;
+    z-index: 10;
+}
+
+.canvas-container {
+    position: relative;
+    width: 100%;
+    height: 70vh;
+}
+
+#threejs-canvas {
+    width: 100%;
+    height: 70vh;
+}
+
+.control-panel {
+    background-color: #2B2A33;
+    color: white;
+    border-right: 1px solid #444;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    height: 100%;
+}
+
+    .control-panel .controls {
+        display: none;
+    }
+
+    .control-panel.expanded {
+        width: 100%;
+    }
+
+    .control-panel.collapsed {
+        width: 100%;
+        height: 70px;
+    }
+
+#toggleButton {
+    margin-top: 0px;
+}
+
+.control-panel button {
+    width: 100%;
+    background-color: black;
+    color: white;
+    border: 1px solid black;
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.control-item, .slider {
+    margin-top: 20px;
+}
+
+    .slider label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .slider input[type="range"], .control-item input[type="number"], .control-item select {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .control-item input[type="number"], .slider input[type="number"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px; /* Adjust padding as needed */
+        margin-top: 5px; /* Spacing between slider and manual input */
+        border: 1px solid #ccc; /* Optional border */
+        border-radius: 4px; /* Rounded corners to match other inputs */
+    }
+
+.control-divider {
+    border: none;
+    height: 1px;
+    background-color: #ddd;
+    margin: 10px 0;
+}
+
+@media (min-width: 768px) {
+    .control-panel.collapsed {
+        width: 80px;
+        height: 100%;
+    }
+
+    .control-panel.expanded {
+        max-width: 300px;
+    }
+
+    .simulation-container {
+        flex-direction: row;
+    }
+
+    .canvas-container {
+        height: 100%;
+    }
+
+    #threejs-canvas {
+        height: 100%;
+    }
 }

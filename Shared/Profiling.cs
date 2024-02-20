@@ -6,7 +6,7 @@ public static class Profiling
 {
     // shell command for exposing api to network: "npx iisexpress-proxy https://localhost:7223 to 3000"
 
-    public const bool ShouldLogMethodProfiles = false;
+    public const bool ShouldLogMethodProfiles = true;
 
     public const string DebugEnvironmentName = "DEVELOPMENT";
     public const string ReleaseEnvironmentName = "PRODUCTION";
