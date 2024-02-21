@@ -100,27 +100,37 @@ function resizeRendererToDisplaySize(renderer) {
     return needResize;
 }
 
-function updateThreeJsScene(magnets, showLoops, gravityField, magneticField, fieldDrawMethod) {
+function updateThreeJsScene(state, drawingParameters) {
+    const magnets = state.magnets;
+    const gravityField = state.gravityFieldData;
+    const magneticField = state.magneticFieldData;
+
     clearMagnetsAndFields();
 
-    const magnetsArray = Array.isArray(magnets) ? magnets : [magnets];
+    if (magnets) {
+        const magnetsArray = Array.isArray(magnets) ? magnets : [magnets];
 
-    magnetsArray.forEach(magnet => {
-        if (showLoops) {
-            createLoopsMagnet(magnet);
-            addMagnetOrientationIndicator(magnet);
-        } else {
-            createCylinderMagnet(magnet);
-            addMagnetOrientationIndicator(magnet);
-        }
-    });
-
-    if (gravityField) {
-        drawFieldVectors(gravityField, 0x00ff00, fieldDrawMethod);
+        magnetsArray.forEach(magnet => {
+            if (drawingParameters.showCoils) {
+                createLoopsMagnet(magnet);
+                addMagnetOrientationIndicator(magnet);
+            } else {
+                createCylinderMagnet(magnet);
+                addMagnetOrientationIndicator(magnet);
+            }
+        });
     }
 
-    if (magneticField) {
-        drawFieldVectors(magneticField, 0xff0000, fieldDrawMethod);
+    if (gravityField && drawingParameters.showGravityField) {
+        drawFieldVectors(gravityField, 0x00ff00, "arrows", "gravity");
+    } else if (!drawingParameters.showGravityField) {
+        clearFieldVectorsOfType("gravity");
+    }
+
+    if (magneticField && drawingParameters.showMagneticField) {
+        drawFieldVectors(magneticField, 0xff0000, drawingParameters.fieldDrawingStyle, "magnetic");
+    } else if (!drawingParameters.showMagneticField) {
+        clearFieldVectorsOfType("magnetic");
     }
 }
 
@@ -136,74 +146,117 @@ function clearMagnetsAndFields() {
     });
 }
 
-function drawFieldVectors(fieldData, color, fieldDrawMethod) {
+function drawFieldVectors(fieldData, color, fieldDrawMethod, fieldType) {
     switch (fieldDrawMethod) {
         case 'arrows':
-            fieldData.forEach((vector) => {
-                const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
-                const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
-                const arrowLength = vector.magnitude;
-
-                const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, color);
-                arrowHelper.name = `arrowObject-${vector.index}`;
-                scene.add(arrowHelper);
-            });
-            break;
-
-        case 'fieldLines': {
-            // Now inside a block, so const declarations are scoped to this block
-            const lineMaterial = new THREE.LineBasicMaterial({ color: color });
-            const maxPoints = 100; // Maximum points in a line
-            const stepSize = 0.01; // How far each step moves
-
             fieldData.forEach(vector => {
-                const geometry = new THREE.BufferGeometry();
-                const positions = new Float32Array(maxPoints * 3); // 3 vertices per point
-                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-                let currentPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
-                for (let i = 0; i < maxPoints; i++) {
-                    positions[i * 3] = currentPosition.x;
-                    positions[i * 3 + 1] = currentPosition.y;
-                    positions[i * 3 + 2] = currentPosition.z;
-
-                    // Move the point along the field direction
-                    const fieldDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
-                    currentPosition.addScaledVector(fieldDirection, stepSize);
-                }
-
-                geometry.setDrawRange(0, maxPoints);
-                const line = new THREE.Line(geometry, lineMaterial);
-                line.name = "arrowObject";
-                scene.add(line);
+                drawArrow(vector, color, fieldType);
             });
             break;
-        }
+
+        case 'fieldLines':
+            fieldData.forEach(vector => {
+                drawFieldLine(vector, color, fieldType);
+            });
+            break;
 
         case 'colorMapping':
             fieldData.forEach(vector => {
-                const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z);
-                const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
-                const arrowLength = vector.magnitude;
-
-                // Map the magnitude to a color
-                const magnitudeNormalized = Math.min(vector.magnitude, 1); // Assuming '1' is max magnitude for normalization
-                const colorScale = new THREE.Color().setHSL(0.7 * (1 - magnitudeNormalized), 1, 0.5); // HSL: hue is adjusted by magnitude
-
-                const arrowHelper = new THREE.ArrowHelper(arrowDirection.normalize(), arrowPosition, arrowLength, colorScale);
-                arrowHelper.name = "arrowObject";
-                scene.add(arrowHelper);
+                drawColorMappedArrow(vector, fieldType);
             });
             break;
 
         case 'volumeRendering':
-            // Placeholder for volume rendering visualization
             console.log("Volume rendering is not implemented yet.");
             break;
 
         default:
             console.warn("Unknown field draw method:", fieldDrawMethod);
             break;
+    }
+}
+
+function clearFieldVectorsOfType(fieldType) {
+    const toRemove = [];
+    scene.traverse((child) => {
+        if (child.name.startsWith(fieldType)) {
+            toRemove.push(child);
+        }
+    });
+    toRemove.forEach((object) => {
+        scene.remove(object);
+    });
+}
+
+function drawArrow(vector, color, fieldType) {
+    const vectorName = `${fieldType}-vectorObject-${vector.index}`;
+    let arrowHelper = scene.getObjectByName(vectorName);
+    const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
+    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    const arrowLength = vector.magnitude;
+
+    if (!arrowHelper) {
+        arrowHelper = new THREE.ArrowHelper(arrowDirection, arrowPosition, arrowLength, color);
+        arrowHelper.name = vectorName;
+        scene.add(arrowHelper);
+    } else {
+        arrowHelper.setDirection(arrowDirection);
+        arrowHelper.setLength(arrowLength);
+        arrowHelper.setColor(new THREE.Color(color));
+        arrowHelper.position.copy(arrowPosition);
+    }
+}
+
+function drawFieldLine(vector, color, fieldType) {
+    const vectorName = `${fieldType}-lineObject-${vector.index}`;
+    let lineObject = scene.getObjectByName(vectorName);
+
+    const maxPoints = 100;
+    const stepSize = 0.01;
+    const positions = new Float32Array(maxPoints * 3);
+
+    let currentPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    for (let i = 0; i < maxPoints; i++) {
+        positions[i * 3] = currentPosition.x;
+        positions[i * 3 + 1] = currentPosition.y;
+        positions[i * 3 + 2] = currentPosition.z;
+
+        const fieldDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
+        currentPosition.addScaledVector(fieldDirection, stepSize);
+    }
+
+    if (!lineObject) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const lineMaterial = new THREE.LineBasicMaterial({ color: color });
+        lineObject = new THREE.Line(geometry, lineMaterial);
+        lineObject.name = vectorName;
+        scene.add(lineObject);
+    } else {
+        lineObject.geometry.attributes.position.array = positions;
+        lineObject.geometry.attributes.position.needsUpdate = true;
+    }
+}
+
+function drawColorMappedArrow(vector, fieldType) {
+    const vectorName = `${fieldType}-vectorObject-${vector.index}`;
+    let arrowHelper = scene.getObjectByName(vectorName);
+    const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
+    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    const arrowLength = vector.magnitude;
+
+    const magnitudeNormalized = Math.min(vector.magnitude, 1);
+    const colorScale = new THREE.Color().setHSL(0.7 * (1 - magnitudeNormalized), 1, 0.5);
+
+    if (!arrowHelper) {
+        arrowHelper = new THREE.ArrowHelper(arrowDirection, arrowPosition, arrowLength, colorScale);
+        arrowHelper.name = vectorName;
+        scene.add(arrowHelper);
+    } else {
+        arrowHelper.setDirection(arrowDirection);
+        arrowHelper.setLength(arrowLength);
+        arrowHelper.setColor(colorScale);
+        arrowHelper.position.copy(arrowPosition);
     }
 }
 
@@ -249,7 +302,7 @@ function createLoopsMagnet(magnet) {
         sheen: 0.5,
         transmission: 0.2,
         thickness: 0.5,
-        //reflectivity 
+        //reflectivity?
     });
 
     for (let i = 0; i < segments; i++) {

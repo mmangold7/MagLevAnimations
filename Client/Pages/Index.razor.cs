@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Components;
-using System.Numerics;
-using Animations.Shared;
+﻿using Animations.Shared;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Diagnostics;
-using System;
+using System.Numerics;
 
 namespace Animations.Client.Pages;
 
@@ -29,7 +28,39 @@ public partial class Index : ComponentBase
     private bool Paused { get; set; } = true;
     private bool AreControlsVisible { get; set; } = true;
     private bool ShowManualInputs { get; set; }
-    public string FieldDrawingType { get; set; } = "colorMapping";
+    private string FieldDrawingType { get; set; } = "colorMapping";
+
+    private async Task ToggleMagnetDrawingStyle()
+    {
+        ShowCoils = !ShowCoils;
+        await UpdateClientVisualization();
+    }
+
+    private async Task ToggleGravityFieldVisibility()
+    {
+        ShowGravityField = !ShowGravityField;
+        if (Paused)
+        {
+            _simulationManager?.RecalculateFields();
+            await UpdateClientVisualization();
+        }
+    }
+
+    private async Task ToggleMagneticFieldVisibility()
+    {
+        ShowMagneticField = !ShowMagneticField;
+        if (Paused)
+        {
+            _simulationManager?.RecalculateFields();
+            await UpdateClientVisualization();
+        }
+    }
+
+    private void ToggleApproximationMode() => UseDipoleApproximation = !UseDipoleApproximation;
+    private void TogglePaused() => Paused = !Paused;
+    private void ToggleManualInputs() => ShowManualInputs = !ShowManualInputs;
+    private void ToggleControlsVisibility() => AreControlsVisible = !AreControlsVisible;
+    private string GetControlPanelClass() => AreControlsVisible ? "expanded" : "collapsed";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -43,9 +74,8 @@ public partial class Index : ComponentBase
     private async Task RestartSimulation()
     {
         CancelSimulation();
-        _simulationManager = await ResetSimulator(_simLoopCancel.Token);
-        var currentState = _simulationManager.GetSimulationState();
-        await SendCurrentStateToClientVisualization(currentState);
+        ResetSimulator();
+        await UpdateClientVisualization();
         await InvokeAsync(StateHasChanged);
         await StartDrawSimulationLoop(_simulationManager, _simLoopCancel.Token);
     }
@@ -57,29 +87,28 @@ public partial class Index : ComponentBase
         _simLoopCancel = new CancellationTokenSource();
     }
 
-    private async Task<SimulationManager> ResetSimulator(CancellationToken simLoopCancelToken)
+    private void ResetSimulator()
     {
         FrameCount = 0;
         FrameRate = 0;
 
-        var simulationManager = new SimulationManager(
-            TimeStep,
-            new Vector3(0, Gravity, 0),
-            new Vector3(SingleSimulationExtent, SingleSimulationExtent, SingleSimulationExtent))
+        _simulationManager = new SimulationManager(GetSimulationParametersFromView());
+        _simulationManager.InitializeTwoMagnets();
+    }
+
+    private SimulationParameters GetSimulationParametersFromView()
+    {
+        return new SimulationParameters
         {
-            ShowGravityField = ShowGravityField,
+            TimeStep = TimeStep,
+            Gravity = new Vector3(0, Gravity, 0),
+            SimulationExtents = new Vector3(SingleSimulationExtent, SingleSimulationExtent, SingleSimulationExtent),
+            Mode = UseDipoleApproximation ? SimulationMode.DipoleApproximation : SimulationMode.VoxelBased,
             Divisions = Divisions,
-            ShowMagneticField = ShowMagneticField
+            VoxelsPerDivision = VoxelsPerDivision,
+            ShowGravityField = ShowGravityField,
+            ShowMagneticField = ShowMagneticField,
         };
-
-        simulationManager.SwitchApproximationTo(UseDipoleApproximation
-            ? SimulationMode.DipoleApproximation
-            : SimulationMode.VoxelBased, Divisions, VoxelsPerDivision);
-
-        simulationManager.InitializeTwoMagnets();
-
-        //await UpdateUi(simLoopCancelToken);
-        return simulationManager;
     }
 
     private async Task StartDrawSimulationLoop(SimulationManager simulationManager, CancellationToken simLoopCancelToken)
@@ -92,8 +121,9 @@ public partial class Index : ComponentBase
             else
                 await Task.Run(async () =>
                 {
-                    var newState = simulationManager.UpdateSimulation();
-                    await SendCurrentStateToClientVisualization(newState);
+                    var parameters = GetSimulationParametersFromView();
+                    simulationManager.UpdateSimulation(parameters);
+                    await UpdateClientVisualization();
                     await DelayUntilNextRequestedFrame(simLoopCancelToken);
                 }, simLoopCancelToken);
         }
@@ -116,38 +146,35 @@ public partial class Index : ComponentBase
 
     private async Task InitializeClientVisualization(float extent)
     {
-        await JsRuntime.InvokeVoidAsync("Animations.initializeThreeJs", new
-        {
-            width = extent,
-            height = extent,
-            depth = extent
-        });
+        await JsRuntime.InvokeVoidAsync("Animations.initializeThreeJs", 
+            new { width = extent, height = extent, depth = extent });
 
         _isVisualizationInitialized = true;
     }
 
-    private async Task SendCurrentStateToClientVisualization(SimulationState state)
+    private async Task UpdateClientVisualization()
     {
-        if (_isVisualizationInitialized && _simulationManager is { Magnets.Count: > 0 })
+        if (_isVisualizationInitialized && _simulationManager != null)
         {
-            //var stopwatch = Stopwatch.StartNew();
-            //var (magnets, gravityField, magneticField) = MapMagnetsToJs();
-            //stopwatch.Stop();
-            //Profiling.LogMethodTime("MapMagnetsToJs", stopwatch.ElapsedMilliseconds);
+            var state = _simulationManager.GetSimulationState();
+            var drawingParameters = new DrawingParameters
+            {
+                ShowCoils = ShowCoils,
+                FieldDrawingStyle = FieldDrawingType,
+                ShowGravityField = ShowGravityField,
+                ShowMagneticField = ShowMagneticField
+            };
 
-
-            var stopwatch = Stopwatch.StartNew();
-            await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene",
-                state.Magnets, ShowCoils, state.GravityFieldData, state.MagneticFieldData, FieldDrawingType);
-            stopwatch.Stop();
-            Profiling.LogMethodTime("JsRuntime.InvokeVoidAsync(Animations.updateThreeJsScene", stopwatch.ElapsedMilliseconds);
-
+            var updateStopwatch = Stopwatch.StartNew();
+            await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", state, drawingParameters);
+            updateStopwatch.Stop();
+            Profiling.LogMethodTime("JsRuntime.InvokeVoidAsync(Animations.updateThreeJsScene", updateStopwatch.ElapsedMilliseconds);
         }
 
-        var stopwatch2 = Stopwatch.StartNew();
+        var stateChangedStopwatch = Stopwatch.StartNew();
         await InvokeAsync(StateHasChanged);
-        stopwatch2.Stop();
-        Profiling.LogMethodTime("InvokeAsync(StateHasChanged)", stopwatch2.ElapsedMilliseconds);
+        stateChangedStopwatch.Stop();
+        Profiling.LogMethodTime("InvokeAsync(StateHasChanged)", stateChangedStopwatch.ElapsedMilliseconds);
     }
 
     private async Task InstallApp()
@@ -157,48 +184,4 @@ public partial class Index : ComponentBase
             $"Install prompt was {(success ? "" : "not")} accepted." +
             $"{(success ? "" : " Event to trigger it might not have been caught.")}");
     }
-
-    private async Task ToggleVisualizationMode()
-    {
-        ShowCoils = !ShowCoils;
-        var currentState = _simulationManager.GetSimulationState();
-        if (Paused) await SendCurrentStateToClientVisualization(currentState);
-    }
-
-    private async Task ToggleGravityField()
-    {
-        ShowGravityField = !ShowGravityField;
-        _simulationManager.ShowGravityField = ShowGravityField;
-        _simulationManager.Divisions = Divisions;
-        if (ShowGravityField) _simulationManager.CalculateGravityField();
-        var currentState = _simulationManager.GetSimulationState();
-        if (Paused) await SendCurrentStateToClientVisualization(currentState);
-    }
-
-    private async Task ToggleMagneticField()
-    {
-        ShowMagneticField = !ShowMagneticField;
-        _simulationManager.ShowMagneticField = ShowMagneticField;
-        _simulationManager.Divisions = Divisions;
-        if (ShowMagneticField) _simulationManager.CalculateMagneticField();
-        var currentState = _simulationManager.GetSimulationState();
-        if (Paused) await SendCurrentStateToClientVisualization(currentState);
-    }
-
-    private async Task ToggleApproximation()
-    {
-        UseDipoleApproximation = !UseDipoleApproximation;
-
-        _simulationManager?.SwitchApproximationTo(UseDipoleApproximation
-            ? SimulationMode.DipoleApproximation
-            : SimulationMode.VoxelBased, Divisions, VoxelsPerDivision);
-
-        var currentState = _simulationManager.GetSimulationState();
-        await SendCurrentStateToClientVisualization(currentState);
-    }
-
-    private void TogglePaused() => Paused = !Paused;
-    private void ToggleManualInputs() => ShowManualInputs = !ShowManualInputs;
-    private void ToggleControlsVisibility() => AreControlsVisible = !AreControlsVisible;
-    private string GetControlPanelClass() => AreControlsVisible ? "expanded" : "collapsed";
 }
