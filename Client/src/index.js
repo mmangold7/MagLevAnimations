@@ -1,7 +1,7 @@
 ﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-var scene, camera, renderer, controls;
+var scene, camera, renderer, controls, simulationGroup;
 
 function initializeThreeJs(dimensions) {
     const canvas = document.getElementById('threejs-canvas');
@@ -11,13 +11,21 @@ function initializeThreeJs(dimensions) {
     }
 
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-
     scene = new THREE.Scene();
+    simulationGroup = new THREE.Group();
 
     setupLightsAndCamera();
     setupOrbitControls();
     addBoundingBox(dimensions);
+    addTableAndRoom();
+    addWalls();
+    addCeilingLight();
+    addCeiling();
     resetCameraToBoundingBox(dimensions);
+
+    simulationGroup.position.set(0, 20.5 + 0.5, 0);
+    scene.add(simulationGroup);
+
     animate();
 };
 
@@ -26,13 +34,11 @@ function setupLightsAndCamera() {
     camera.position.set(0, 1, 2);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-    //scene.background = new THREE.Color(0xbbbbbb);
+    scene.add(new THREE.AmbientLight(0xffffff, 5));
 
-    scene.add(new THREE.AmbientLight(0xffffff, 10));
-
-    const light = new THREE.PointLight(0xffffff, 10, 0, 0);
-    light.position.copy(camera.position);
-    scene.add(light);
+    //const light = new THREE.PointLight(0xffffff, 10, 0, 0);
+    //light.position.copy(camera.position);
+    //scene.add(light);
 }
 
 function setupOrbitControls() {
@@ -46,31 +52,139 @@ function setupOrbitControls() {
     controls.update();
 }
 
+function createCheckerboardTexture() {
+    const size = 64; // Texture size
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext('2d');
+
+    for (let x = 0; x < size; x += 8) {
+        for (let y = 0; y < size; y += 8) {
+            context.fillStyle = (x ^ y) & 8 ? '#FFF' : '#CCC'; // Alternate colors
+            context.fillRect(x, y, 8, 8);
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(25, 25); // Adjust based on your scene
+    return texture;
+}
+
 function addBoundingBox(dimensions) {
     const geometry = new THREE.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
     const edges = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
-    line.position.set(0, 0, 0);
+    // Align the bottom of the bounding box with the top surface of the desk
+    line.position.set(0, 5, 0); // Desk height (20.5) + half of the bounding box's height to sit on the surface
     line.name = "boundingBox";
-    scene.add(line);
+    simulationGroup.add(line);
 
     const gridHelper = new THREE.GridHelper(dimensions.width, 10);
-    gridHelper.position.y = -(dimensions.height / 2);
-    scene.add(gridHelper);
+    gridHelper.position.set(0, 0, 0); // Adjusted to sit right on the desk surface within the bounding box
+    simulationGroup.add(gridHelper);
 
-    const axesHelper = new THREE.AxesHelper(1);
-    axesHelper.position.set(dimensions.width / 2, -dimensions.height / 2, dimensions.depth / 2);
-    scene.add(axesHelper);
+    const axesHelper = new THREE.AxesHelper(5);
+    axesHelper.position.set(-dimensions.width / 2, 0, dimensions.depth / 2); // Adjust to sit at the corner of the grid
+    simulationGroup.add(axesHelper);
+}
+
+function addTableAndRoom() {
+    // Desk surface
+    const deskGeometry = new THREE.BoxGeometry(40, 1, 20);
+    const deskMaterial = new THREE.MeshStandardMaterial({
+        color: '#8B4513', // SaddleBrown color
+        roughness: 0.6,
+        metalness: 0.2
+    });
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 20), deskMaterial);
+    desk.position.set(0, 20.5, 0);
+    scene.add(desk);
+
+    // Desk legs
+    const legGeometry = new THREE.CylinderGeometry(0.5, 0.5, 20, 32);
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x654321 });
+    const legPositions = [
+        new THREE.Vector3(-19.5, 10, -9.5),
+        new THREE.Vector3(19.5, 10, -9.5),
+        new THREE.Vector3(-19.5, 10, 9.5),
+        new THREE.Vector3(19.5, 10, 9.5)
+    ];
+
+    legPositions.forEach((position) => {
+        const leg = new THREE.Mesh(legGeometry, legMaterial);
+        leg.position.copy(position);
+        scene.add(leg);
+    });
+
+    // Floor
+    const floorMaterial = new THREE.MeshStandardMaterial({
+        map: createCheckerboardTexture()
+    });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    scene.add(floor);
+
+    simulationGroup.position.set(0, 20.5 + 0.5, 0);
+}
+
+function addWalls() {
+    const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF, side: THREE.DoubleSide });
+
+    const backWallGeometry = new THREE.PlaneGeometry(200, 80);
+    const frontWallGeometry = new THREE.PlaneGeometry(200, 80);
+    const sideWallGeometry = new THREE.PlaneGeometry(200, 80);
+
+    const walls = [
+        { geometry: backWallGeometry, position: new THREE.Vector3(0, 40, -100) },
+        { geometry: frontWallGeometry, position: new THREE.Vector3(0, 40, 100) },
+        { geometry: sideWallGeometry, position: new THREE.Vector3(-100, 40, 0), rotation: Math.PI / 2 },
+        { geometry: sideWallGeometry, position: new THREE.Vector3(100, 40, 0), rotation: Math.PI / 2 }
+    ];
+
+    walls.forEach((wallSpec) => {
+        const wall = new THREE.Mesh(wallSpec.geometry, wallMaterial);
+        wall.position.copy(wallSpec.position);
+        if (wallSpec.rotation) wall.rotation.y = wallSpec.rotation;
+        scene.add(wall);
+    });
+
+    const colors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'];
+    const panelWidth = 200 / colors.length;
+
+    colors.forEach((color, i) => {
+        const panelMaterial = new THREE.MeshLambertMaterial({ color });
+        const panelGeometry = new THREE.PlaneGeometry(panelWidth, 80);
+        const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+        panel.position.set(-100 + panelWidth * i + panelWidth / 2, 40, -100); // Position each panel
+        scene.add(panel);
+    });
+}
+
+function addCeiling() {
+    const ceilingGeometry = new THREE.PlaneGeometry(200, 200);
+    const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, side: THREE.DoubleSide, roughness: 0.4 });
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.y = 80;
+    scene.add(ceiling);
+}
+
+function addCeilingLight() {
+    // Light source
+    const light = new THREE.PointLight(0xffffff, 1, 0, 2);
+    light.position.set(0, 75, 0);
+    scene.add(light);
 }
 
 function resetCameraToBoundingBox(dimensions) {
+    const boundingBoxCenter = new THREE.Vector3(0, 21, 0); // Centered and adjusted for height on the desk
     const maxDimension = Math.max(dimensions.width, dimensions.height, dimensions.depth);
     const fov = camera.fov * (Math.PI / 180);
     const cameraZ = Math.abs(maxDimension / 2 * Math.tan(fov / 2) * 2);
-    camera.position.z = cameraZ;
-
-    const center = new THREE.Vector3(0, 0, 0);
-    controls.target = center;
+    camera.position.set(boundingBoxCenter.x, boundingBoxCenter.y, boundingBoxCenter.z + cameraZ);
+    controls.target.copy(boundingBoxCenter);
     controls.update();
 }
 
@@ -109,15 +223,10 @@ function updateThreeJsScene(state, drawingParameters) {
 
     if (magnets) {
         const magnetsArray = Array.isArray(magnets) ? magnets : [magnets];
-
         magnetsArray.forEach(magnet => {
-            if (drawingParameters.showCoils) {
-                createLoopsMagnet(magnet);
-                addMagnetOrientationIndicator(magnet);
-            } else {
-                createCylinderMagnet(magnet);
-                addMagnetOrientationIndicator(magnet);
-            }
+            const magnetMesh = (drawingParameters.showCoils ? createLoopsMagnet(magnet) : createCylinderMagnet(magnet));
+            simulationGroup.add(magnetMesh);
+            addMagnetOrientationIndicator(magnet);
         });
     }
 
@@ -136,13 +245,13 @@ function updateThreeJsScene(state, drawingParameters) {
 
 function clearMagnetsAndFields() {
     const toRemove = [];
-    scene.traverse((child) => {
-        if (child.name === "magnetObject" || child.name === "arrowObject") {
+    simulationGroup.traverse((child) => {
+        if (child.name === "magnetObject" || child.name.startsWith("vectorObject") || child.name.startsWith("lineObject")) {
             toRemove.push(child);
         }
     });
     toRemove.forEach((object) => {
-        scene.remove(object);
+        simulationGroup.remove(object);
     });
 }
 
@@ -178,27 +287,27 @@ function drawFieldVectors(fieldData, color, fieldDrawMethod, fieldType) {
 
 function clearFieldVectorsOfType(fieldType) {
     const toRemove = [];
-    scene.traverse((child) => {
+    simulationGroup.traverse((child) => {
         if (child.name.startsWith(fieldType)) {
             toRemove.push(child);
         }
     });
     toRemove.forEach((object) => {
-        scene.remove(object);
+        simulationGroup.remove(object);
     });
 }
 
 function drawArrow(vector, color, fieldType) {
     const vectorName = `${fieldType}-vectorObject-${vector.index}`;
-    let arrowHelper = scene.getObjectByName(vectorName);
+    let arrowHelper = simulationGroup.getObjectByName(vectorName);
     const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
-    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y + 5, vector.position.z);
     const arrowLength = vector.magnitude;
 
     if (!arrowHelper) {
         arrowHelper = new THREE.ArrowHelper(arrowDirection, arrowPosition, arrowLength, color);
         arrowHelper.name = vectorName;
-        scene.add(arrowHelper);
+        simulationGroup.add(arrowHelper);
     } else {
         arrowHelper.setDirection(arrowDirection);
         arrowHelper.setLength(arrowLength);
@@ -209,13 +318,13 @@ function drawArrow(vector, color, fieldType) {
 
 function drawFieldLine(vector, color, fieldType) {
     const vectorName = `${fieldType}-lineObject-${vector.index}`;
-    let lineObject = scene.getObjectByName(vectorName);
+    let lineObject = simulationGroup.getObjectByName(vectorName);
 
     const maxPoints = 100;
     const stepSize = 0.01;
     const positions = new Float32Array(maxPoints * 3);
 
-    let currentPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    let currentPosition = new THREE.Vector3(vector.position.x, vector.position.y + 5, vector.position.z);
     for (let i = 0; i < maxPoints; i++) {
         positions[i * 3] = currentPosition.x;
         positions[i * 3 + 1] = currentPosition.y;
@@ -231,7 +340,7 @@ function drawFieldLine(vector, color, fieldType) {
         const lineMaterial = new THREE.LineBasicMaterial({ color: color });
         lineObject = new THREE.Line(geometry, lineMaterial);
         lineObject.name = vectorName;
-        scene.add(lineObject);
+        simulationGroup.add(lineObject);
     } else {
         lineObject.geometry.attributes.position.array = positions;
         lineObject.geometry.attributes.position.needsUpdate = true;
@@ -240,9 +349,9 @@ function drawFieldLine(vector, color, fieldType) {
 
 function drawColorMappedArrow(vector, fieldType) {
     const vectorName = `${fieldType}-vectorObject-${vector.index}`;
-    let arrowHelper = scene.getObjectByName(vectorName);
+    let arrowHelper = simulationGroup.getObjectByName(vectorName);
     const arrowDirection = new THREE.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
-    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y, vector.position.z);
+    const arrowPosition = new THREE.Vector3(vector.position.x, vector.position.y + 5, vector.position.z);
     const arrowLength = vector.magnitude;
 
     const magnitudeNormalized = Math.min(vector.magnitude, 1);
@@ -251,7 +360,7 @@ function drawColorMappedArrow(vector, fieldType) {
     if (!arrowHelper) {
         arrowHelper = new THREE.ArrowHelper(arrowDirection, arrowPosition, arrowLength, colorScale);
         arrowHelper.name = vectorName;
-        scene.add(arrowHelper);
+        simulationGroup.add(arrowHelper);
     } else {
         arrowHelper.setDirection(arrowDirection);
         arrowHelper.setLength(arrowLength);
@@ -284,7 +393,8 @@ function createCylinderMagnet(magnet) {
     const rotationAxis = new THREE.Vector3().crossVectors(axis, desiredOrientation).normalize();
     cylinder.setRotationFromAxisAngle(rotationAxis, angle);
 
-    scene.add(cylinder);
+    cylinder.position.set(magnet.position.x, magnet.position.y + 5, magnet.position.z);
+    simulationGroup.add(cylinder);
     return cylinder;
 }
 
@@ -318,19 +428,19 @@ function createLoopsMagnet(magnet) {
         const rotationAxis = new THREE.Vector3().crossVectors(axis, desiredOrientation).normalize();
         loop.setRotationFromAxisAngle(rotationAxis, angle);
 
-        scene.add(loop);
+        simulationGroup.add(loop);
     }
 }
 
 function addMagnetOrientationIndicator(magnet) {
     var dir = new THREE.Vector3(magnet.magnetization.x, magnet.magnetization.y, magnet.magnetization.z).normalize();
-    var origin = new THREE.Vector3(magnet.position.x, magnet.position.y, magnet.position.z);
+    var origin = new THREE.Vector3(magnet.position.x, magnet.position.y + 5, magnet.position.z);
     var length = 1.0;
     var hex = 0xffff00;
 
     var arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex);
     arrowHelper.name = "arrowObject";
-    scene.add(arrowHelper);
+    simulationGroup.add(arrowHelper);
 }
 
 export { updateThreeJsScene, initializeThreeJs };
