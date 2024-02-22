@@ -157,6 +157,7 @@ public partial class Index : ComponentBase
         if (_isVisualizationInitialized && _simulationManager != null)
         {
             var state = _simulationManager.GetSimulationState();
+            state.TimeSinceStart = FrameCount * TimeStep;
             var drawingParameters = new DrawingParameters
             {
                 ShowCoils = ShowCoils,
