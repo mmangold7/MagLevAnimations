@@ -274,7 +274,7 @@ function addDigitalClock() {
     loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
         const geometry = new TextGeometry('00:00:00', {
             font: font,
-            size: 5,
+            size: 10,
             height: 2,
             curveSegments: 12,
             bevelEnabled: true,
@@ -287,7 +287,7 @@ function addDigitalClock() {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(-10, 0, 0);
         mesh.rotation.y = Math.PI / 2;
-        mesh.position.set(-95, 40, 50);
+        mesh.position.set(-95, 40 - 5, 50 + 20);
         scene.add(mesh);
 
         digitalClock.updateTime = function (simulationTime) {
@@ -315,7 +315,7 @@ function addDigitalClock() {
             // Update the geometry of the mesh with the new time string
             mesh.geometry = new TextGeometry(timeString, {
                 font: font,
-                size: 5,
+                size: 10,
                 height: 2,
                 curveSegments: 12,
                 bevelEnabled: true,
