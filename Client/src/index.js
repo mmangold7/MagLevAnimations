@@ -1,4 +1,6 @@
 ﻿import * as THREE from 'three';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 var scene, camera, renderer, controls;
@@ -262,96 +264,69 @@ function addBackWallRainbow() {
 //drawing clocks
 function addDigitalClock() {
     digitalClock = new THREE.Group();
-    digitalClock.rotation.y = Math.PI / 2;
-    digitalClock.position.set(-95, 40, 50);
 
-    const digits = [];
-    for (let i = 0; i < 6; i++) { // HH:MM:SS
-        const digit = createNumeral(0); // Start with '0'
-        digit.position.x = (i - 2.5) * 12; // Align digits horizontally within the group
-        if (i === 2 || i === 4) digit.position.x += 3; // Add space for colon
-        digitalClock.add(digit);
-        digits.push(digit);
-    }
+    digitalClock.updateTime = function () {
+        console.warn('Font not loaded yet.');
+    };
 
-    const colonMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
-    const colonGeometry = new THREE.CircleGeometry(0.5, 32);
-    [1, 3].forEach(i => {
-        const colonTop = new THREE.Mesh(colonGeometry, colonMaterial);
-        const colonBottom = new THREE.Mesh(colonGeometry, colonMaterial);
-        colonTop.position.set((i - 2.5) * 12 + 6, 3, 0);
-        colonBottom.position.set((i - 2.5) * 12 + 6, -3, 0);
-        digitalClock.add(colonTop);
-        digitalClock.add(colonBottom);
-    });
+    const loader = new FontLoader();
 
-    digitalClock.updateTime = function (simulationTime) {
-        const time = new Date(simulationTime * 1000);
-        const hours = time.getHours().toString().padStart(2, '0');
-        const minutes = time.getMinutes().toString().padStart(2, '0');
-        const seconds = time.getSeconds().toString().padStart(2, '0');
-        const timeString = hours + minutes + seconds;
+    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+        const geometry = new TextGeometry('00:00:00', {
+            font: font,
+            size: 5,
+            height: 2,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.1,
+            bevelSize: 0.1,
+            bevelSegments: 5
+        });
 
-        timeString.split('').forEach((num, index) => {
-            while (digits[index].children.length) {
-                digits[index].remove(digits[index].children[0]);
+        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(-10, 0, 0);
+        mesh.rotation.y = Math.PI / 2;
+        mesh.position.set(-95, 40, 50);
+        scene.add(mesh);
+
+        digitalClock.updateTime = function (simulationTime) {
+            // Ensure simulationTime is in milliseconds for JavaScript Date object
+            const time = new Date(simulationTime * 1000);
+
+            // Get hours, minutes, and seconds
+            let hours = time.getUTCHours(); // Use getUTCHours to avoid timezone offset
+            let minutes = time.getUTCMinutes();
+            let seconds = time.getUTCSeconds();
+
+            // Convert to 12-hour format if needed
+            if (hours > 12) {
+                hours -= 12;
             }
 
-            const numeral = createNumeral(parseInt(num));
-            digits[index].add(...numeral.children);
-        });
-    };
+            // Pad single digits with leading zero
+            hours = String(hours).padStart(2, '0');
+            minutes = String(minutes).padStart(2, '0');
+            seconds = String(seconds).padStart(2, '0');
 
-    scene.add(digitalClock);
-}
-function createSegment() {
-    const segmentLength = 5;
-    const segmentThickness = 0.5;
-    const diamondTipLength = 1;
+            // Combine into a time string
+            const timeString = `${hours}:${minutes}:${seconds}`;
 
-    const shape = new THREE.Shape();
-    shape.moveTo(-segmentThickness / 2, diamondTipLength);
-    shape.lineTo(0, 0);
-    shape.lineTo(segmentThickness / 2, diamondTipLength);
-    shape.lineTo(segmentThickness / 2, segmentLength - diamondTipLength);
-    shape.lineTo(0, segmentLength);
-    shape.lineTo(-segmentThickness / 2, segmentLength - diamondTipLength);
-    shape.lineTo(-segmentThickness / 2, diamondTipLength);
-
-    const extrudeSettings = {
-        steps: 1,
-        depth: segmentThickness,
-        bevelEnabled: false,
-    };
-
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    const material = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
-    const mesh = new THREE.Mesh(geometry, material);
-
-    return mesh;
-}
-function createNumeral(num) {
-    const numeral = new THREE.Group();
-    const segmentPositions = [
-        { x: 0, y: 10, rotation: 0 }, // Top
-        { x: 5, y: 5, rotation: Math.PI / 2 }, // Top Right
-        { x: 5, y: -5, rotation: Math.PI / 2 }, // Bottom Right
-        { x: 0, y: -10, rotation: 0 }, // Bottom
-        { x: -5, y: -5, rotation: Math.PI / 2 }, // Bottom Left
-        { x: -5, y: 5, rotation: Math.PI / 2 }, // Top Left
-        { x: 0, y: 0, rotation: 0 } // Middle
-    ];
-
-    numeralSegments[num.toString()].forEach((isActive, index) => {
-        if (isActive) {
-            const segment = createSegment();
-            segment.position.set(segmentPositions[index].x, segmentPositions[index].y, 0);
-            segment.rotation.z = segmentPositions[index].rotation;
-            numeral.add(segment);
-        }
+            // Update the geometry of the mesh with the new time string
+            mesh.geometry = new TextGeometry(timeString, {
+                font: font,
+                size: 5,
+                height: 2,
+                curveSegments: 12,
+                bevelEnabled: true,
+                bevelThickness: 0.1,
+                bevelSize: 0.1,
+                bevelSegments: 5
+            });
+        };
     });
 
-    return numeral;
+    scene.add(digitalClock);
 }
 function addAnalogClock() {
     const radius = 30;

@@ -15,7 +15,7 @@ public partial class Index : ComponentBase
 
     private int Divisions { get; set; } = 10;
     private int VoxelsPerDivision { get; set; } = 10;
-    private float TimeStep { get; set; } = 0.01f;
+    private float TimeStep { get; set; } = 0.05f;
     private float Gravity { get; set; } = -9.81f;
     private float SingleSimulationExtent { get; set; } = 10f;
     private bool ShowCoils { get; set; }
