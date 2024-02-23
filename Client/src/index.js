@@ -193,15 +193,15 @@ function addWalls() {
         side: THREE.DoubleSide
     });
 
-    const backWallGeometry = new THREE.PlaneGeometry(200, 100);
-    const frontWallGeometry = new THREE.PlaneGeometry(200, 100);
-    const sideWallGeometry = new THREE.PlaneGeometry(200, 100);
+    const backWallGeometry = new THREE.PlaneGeometry(200, 80);
+    const frontWallGeometry = new THREE.PlaneGeometry(200, 80);
+    const sideWallGeometry = new THREE.PlaneGeometry(200, 80);
 
     const walls = [
-        { geometry: backWallGeometry, position: new THREE.Vector3(0, 50, -100) },
-        { geometry: frontWallGeometry, position: new THREE.Vector3(0, 50, 100) },
-        { geometry: sideWallGeometry, position: new THREE.Vector3(-100, 50, 0), rotation: Math.PI / 2 },
-        { geometry: sideWallGeometry, position: new THREE.Vector3(100, 50, 0), rotation: Math.PI / 2 }
+        { geometry: backWallGeometry, position: new THREE.Vector3(0, 40, -100) },
+        { geometry: frontWallGeometry, position: new THREE.Vector3(0, 40, 100) },
+        { geometry: sideWallGeometry, position: new THREE.Vector3(-100, 40, 0), rotation: Math.PI / 2 },
+        { geometry: sideWallGeometry, position: new THREE.Vector3(100, 40, 0), rotation: Math.PI / 2 }
     ];
 
     walls.forEach((wallSpec) => {
@@ -216,21 +216,21 @@ function addCeiling() {
     const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0x808080, side: THREE.DoubleSide, roughness: 0.4 });
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.y = 100;
+    ceiling.position.y = 80;
     scene.add(ceiling);
 }
 function addTable() {
     const tableMaterial = new THREE.MeshStandardMaterial({
-        color: 0x7F7F7F,
+        color: 0xBFBFBF,
         roughness: 0.5,
         metalness: 0.1
     });
-    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(50, 1, 20), tableMaterial);
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 20), tableMaterial);
     tableTop.position.set(0, 20.5, 0);
     scene.add(tableTop);
 
     const legMaterial = new THREE.MeshStandardMaterial({
-        color: 0x606060,
+        color: 0x505050,
         roughness: 0.5,
         metalness: 0.1
     });
@@ -252,9 +252,9 @@ function addBackWallRainbow() {
 
     colors.forEach((color, i) => {
         const panelMaterial = new THREE.MeshLambertMaterial({ color });
-        const panelGeometry = new THREE.PlaneGeometry(panelWidth, 100);
+        const panelGeometry = new THREE.PlaneGeometry(panelWidth, 80);
         const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-        panel.position.set(-100 + panelWidth * i + panelWidth / 2, 50, -99.9);
+        panel.position.set(-100 + panelWidth * i + panelWidth / 2, 40, -99.9);
         scene.add(panel);
     });
 }
@@ -263,7 +263,7 @@ function addBackWallRainbow() {
 function addDigitalClock() {
     digitalClock = new THREE.Group();
     digitalClock.rotation.y = Math.PI / 2;
-    digitalClock.position.set(-95, 50, 50);
+    digitalClock.position.set(-95, 40, 50);
 
     const digits = [];
     for (let i = 0; i < 6; i++) { // HH:MM:SS
@@ -354,17 +354,17 @@ function createNumeral(num) {
     return numeral;
 }
 function addAnalogClock() {
-    const radius = 40;
+    const radius = 30;
     const clockGeometry = new THREE.CircleGeometry(radius, 32);
     const clockMaterial = new THREE.MeshLambertMaterial({ color: 0xCCCCCC });
     analogClock = new THREE.Mesh(clockGeometry, clockMaterial);
-    analogClock.position.set(-99.9, 50, -50);
+    analogClock.position.set(-99.9, 40, -50);
     analogClock.rotation.y = Math.PI / 2;
     scene.add(analogClock);
 
     const hourHand = createClockHand(4, 20, 0x000000, 0.1);
-    const minuteHand = createClockHand(2, 30, 0x000000, 0.2);
-    const secondHand = createClockHand(1, 36, 0xFF0000, 0.3);
+    const minuteHand = createClockHand(2, 25, 0x000000, 0.2);
+    const secondHand = createClockHand(1, 30, 0xFF0000, 0.3);
 
     analogClock.add(hourHand);
     analogClock.add(minuteHand);

@@ -163,6 +163,7 @@ public class SimulationManager
         {
             Vector3 totalForce = Vector3.Zero;
 
+            // Calculate the total force from all other magnets
             foreach (var sourceMagnet in _magnets.Where(m => m != targetMagnet))
             {
                 foreach (var targetVoxel in targetMagnet.Voxels)
@@ -178,9 +179,18 @@ public class SimulationManager
                 }
             }
 
+            // Add gravity force
             Vector3 gravityForce = _gravity * targetMagnet.Mass;
             totalForce += gravityForce;
-            targetMagnet.Position += totalForce * _timeStep / targetMagnet.Mass;
+
+            // Calculate acceleration
+            Vector3 acceleration = totalForce / targetMagnet.Mass;
+
+            // Update velocity (Assuming targetMagnet.Velocity exists and is initialized)
+            targetMagnet.Velocity += acceleration * _timeStep;
+
+            // Update position using velocity
+            targetMagnet.Position += targetMagnet.Velocity * _timeStep;
         }
     }
     private void UpdateMagnetPositionsUsingDipoleApproximation()
@@ -189,15 +199,25 @@ public class SimulationManager
         {
             Vector3 totalForce = Vector3.Zero;
 
+            // Calculate the total force from other magnets
             foreach (var source in _magnets.Where(m => m != target))
             {
                 Vector3 forceFromSource = CalculateDipoleDipoleForce(target, source);
                 totalForce += forceFromSource;
             }
 
+            // Add gravity force
             Vector3 gravityForce = _gravity * target.Mass;
             totalForce += gravityForce;
-            target.Position += totalForce / target.Mass * _timeStep;
+
+            // Calculate acceleration
+            Vector3 acceleration = totalForce / target.Mass;
+
+            // Update velocity (Assuming target.Velocity exists and is initialized)
+            target.Velocity += acceleration * _timeStep;
+
+            // Update position using velocity
+            target.Position += target.Velocity * _timeStep;
         }
     }
     private Vector3 CalculateDipoleDipoleForce(Magnet target, Magnet source)

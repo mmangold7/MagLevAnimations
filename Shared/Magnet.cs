@@ -6,12 +6,13 @@ public class Magnet
 {
     public MagnetType Type { get; set; }
     public bool IsFixed { get; set; }
-    public Vector3 Position { get; set; }
-    public Vector3 Magnetization { get; set; }
     public float Radius { get; set; }
     public float Length { get; set; }
-    public float Current { get; set; }
     public float Mass { get; set; }
+    public Vector3 Position { get; set; }
+    public Vector3 Velocity { get; set; }
+    public Vector3 Magnetization { get; set; }
+    public float Current { get; set; }
 
     public List<Voxel> Voxels { get; set; } = new();
 
