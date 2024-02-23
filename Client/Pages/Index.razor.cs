@@ -29,13 +29,14 @@ public partial class Index : ComponentBase
     private bool AreControlsVisible { get; set; } = true;
     private bool ShowManualInputs { get; set; }
     private string FieldDrawingType { get; set; } = "colorMapping";
+    private float AmbientLightLevel { get; set; } = 1;
+    private float CeilingLightLevel { get; set; } = 1;
 
     private async Task ToggleMagnetDrawingStyle()
     {
         ShowCoils = !ShowCoils;
         await UpdateClientVisualization();
     }
-
     private async Task ToggleGravityFieldVisibility()
     {
         ShowGravityField = !ShowGravityField;
@@ -45,7 +46,6 @@ public partial class Index : ComponentBase
             await UpdateClientVisualization();
         }
     }
-
     private async Task ToggleMagneticFieldVisibility()
     {
         ShowMagneticField = !ShowMagneticField;
@@ -55,12 +55,37 @@ public partial class Index : ComponentBase
             await UpdateClientVisualization();
         }
     }
-
     private void ToggleApproximationMode() => UseDipoleApproximation = !UseDipoleApproximation;
     private void TogglePaused() => Paused = !Paused;
     private void ToggleManualInputs() => ShowManualInputs = !ShowManualInputs;
     private void ToggleControlsVisibility() => AreControlsVisible = !AreControlsVisible;
     private string GetControlPanelClass() => AreControlsVisible ? "expanded" : "collapsed";
+    private SimulationParameters GetSimulationParametersFromView()
+    {
+        return new SimulationParameters
+        {
+            TimeStep = TimeStep,
+            Gravity = new Vector3(0, Gravity, 0),
+            SimulationExtents = new Vector3(SingleSimulationExtent, SingleSimulationExtent, SingleSimulationExtent),
+            Mode = UseDipoleApproximation ? SimulationMode.DipoleApproximation : SimulationMode.VoxelBased,
+            Divisions = Divisions,
+            VoxelsPerDivision = VoxelsPerDivision,
+            ShowGravityField = ShowGravityField,
+            ShowMagneticField = ShowMagneticField,
+        };
+    }
+    private DrawingParameters GetDrawingParametersFromView()
+    {
+        return new DrawingParameters
+        {
+            ShowCoils = ShowCoils,
+            FieldDrawingStyle = FieldDrawingType,
+            ShowGravityField = ShowGravityField,
+            ShowMagneticField = ShowMagneticField,
+            AmbientLightLevel = AmbientLightLevel,
+            CeilingLightLevel = CeilingLightLevel
+        };
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -79,14 +104,12 @@ public partial class Index : ComponentBase
         await InvokeAsync(StateHasChanged);
         await StartDrawSimulationLoop(_simulationManager, _simLoopCancel.Token);
     }
-
     private void CancelSimulation()
     {
         _simLoopCancel.Cancel();
         _simLoopCancel.Dispose();
         _simLoopCancel = new CancellationTokenSource();
     }
-
     private void ResetSimulator()
     {
         FrameCount = 0;
@@ -95,22 +118,6 @@ public partial class Index : ComponentBase
         _simulationManager = new SimulationManager(GetSimulationParametersFromView());
         _simulationManager.InitializeTwoMagnets();
     }
-
-    private SimulationParameters GetSimulationParametersFromView()
-    {
-        return new SimulationParameters
-        {
-            TimeStep = TimeStep,
-            Gravity = new Vector3(0, Gravity, 0),
-            SimulationExtents = new Vector3(SingleSimulationExtent, SingleSimulationExtent, SingleSimulationExtent),
-            Mode = UseDipoleApproximation ? SimulationMode.DipoleApproximation : SimulationMode.VoxelBased,
-            Divisions = Divisions,
-            VoxelsPerDivision = VoxelsPerDivision,
-            ShowGravityField = ShowGravityField,
-            ShowMagneticField = ShowMagneticField,
-        };
-    }
-
     private async Task StartDrawSimulationLoop(SimulationManager simulationManager, CancellationToken simLoopCancelToken)
     {
         while (!simLoopCancelToken.IsCancellationRequested)
@@ -128,7 +135,6 @@ public partial class Index : ComponentBase
                 }, simLoopCancelToken);
         }
     }
-
     private async Task DelayUntilNextRequestedFrame(CancellationToken simLoopCancelToken)
     {
         var currentFrameTime = DateTime.UtcNow;
@@ -147,27 +153,20 @@ public partial class Index : ComponentBase
     private async Task InitializeClientVisualization(float extent)
     {
         await JsRuntime.InvokeVoidAsync("Animations.initializeThreeJs", 
-            new { width = extent, height = extent, depth = extent });
+            new { width = extent, height = extent, depth = extent },
+            GetDrawingParametersFromView());
 
         _isVisualizationInitialized = true;
     }
-
     private async Task UpdateClientVisualization()
     {
         if (_isVisualizationInitialized && _simulationManager != null)
         {
             var state = _simulationManager.GetSimulationState();
             state.TimeSinceStart = FrameCount * TimeStep;
-            var drawingParameters = new DrawingParameters
-            {
-                ShowCoils = ShowCoils,
-                FieldDrawingStyle = FieldDrawingType,
-                ShowGravityField = ShowGravityField,
-                ShowMagneticField = ShowMagneticField
-            };
 
             var updateStopwatch = Stopwatch.StartNew();
-            await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", state, drawingParameters);
+            await JsRuntime.InvokeVoidAsync("Animations.updateThreeJsScene", state, GetDrawingParametersFromView());
             updateStopwatch.Stop();
             Profiling.LogMethodTime("JsRuntime.InvokeVoidAsync(Animations.updateThreeJsScene", updateStopwatch.ElapsedMilliseconds);
         }
