@@ -1,3 +1,4 @@
+using BepuPhysics;
 using System.Numerics;
 
 namespace Animations.Shared;
@@ -13,8 +14,10 @@ public class Magnet
     public Vector3 Velocity { get; set; }
     public Vector3 Magnetization { get; set; }
     public float Current { get; set; }
+    public BodyHandle PhysicsEngineBodyHandle { get; set; }
 
     public List<Voxel> Voxels { get; set; } = new();
+    public Quaternion Orientation { get; set; }
 
     public Magnet(
         Vector3 position,

@@ -337,8 +337,8 @@ function addAnalogClock() {
     analogClock.rotation.y = Math.PI / 2;
     scene.add(analogClock);
 
-    const hourHand = createClockHand(4, 20, 0x000000, 0.1);
-    const minuteHand = createClockHand(2, 25, 0x000000, 0.2);
+    const hourHand = createClockHand(2, 20, 0x000000, 0.1);
+    const minuteHand = createClockHand(1.5, 25, 0x000000, 0.2);
     const secondHand = createClockHand(1, 30, 0xFF0000, 0.3);
 
     analogClock.add(hourHand);

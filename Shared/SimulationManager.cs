@@ -1,3 +1,9 @@
+using BepuPhysics;
+using BepuPhysics.Collidables;
+using BepuPhysics.CollisionDetection;
+using BepuPhysics.Constraints;
+using BepuUtilities;
+using BepuUtilities.Memory;
 using System.Numerics;
 
 namespace Animations.Shared;
@@ -12,9 +18,10 @@ public class SimulationManager
     private Vector3 _gravity;
     private Vector3 _simulationExtents;
     private SimulationMode _currentMode;
+    private readonly Simulation _simulation;
 
     private readonly List<Magnet> _magnets = new();
-    private readonly List<FieldVector> _gravityFieldVectors  = new();
+    private readonly List<FieldVector> _gravityFieldVectors = new();
     private readonly List<FieldVector> _magneticFieldVectors = new();
 
     private readonly Dictionary<int, FieldVector> _previousMagneticFieldVectors = new();
@@ -23,12 +30,104 @@ public class SimulationManager
     //public api
     public SimulationManager(SimulationParameters parameters)
     {
+        var bufferPool = new BufferPool();
+        var narrowPhaseCallbacks = new NarrowPhaseCallbacks();
+        var poseIntegratorCallbacks = new PoseIntegratorCallbacks(new Vector3(0, parameters.Gravity.Y, 0));
+        var solveDescription = new SolveDescription(4, 1);
+        ITimestepper timestepper = null;
+        SimulationAllocationSizes? initialAllocationSizes = null;
+
+        _simulation = Simulation.Create(
+            bufferPool,
+            narrowPhaseCallbacks,
+            poseIntegratorCallbacks,
+            solveDescription,
+            timestepper,
+            initialAllocationSizes
+        );
+
+        var cylinder = new Cylinder(1f, 0.5f); // 1 meter tall, 0.5 meters in radius.
+        var cylinderInertia = cylinder.ComputeInertia(10); // 10 kg mass.
+        var cylinderIndex = _simulation.Shapes.Add(cylinder);
+
+        var bodyDescription1 = BodyDescription.CreateDynamic(new Vector3(0, 5, 0), cylinderInertia, new CollidableDescription(cylinderIndex, 0.1f), new BodyActivityDescription(0.01f));
+        _simulation.Bodies.Add(bodyDescription1);
+
+        var bodyDescription2 = BodyDescription.CreateDynamic(new Vector3(0, 10, 0), cylinderInertia, new CollidableDescription(cylinderIndex, 0.1f), new BodyActivityDescription(0.01f));
+        _simulation.Bodies.Add(bodyDescription2);
+
         SetSimulationParameters(parameters);
+    }
+
+    public struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
+    {
+        public void Initialize(Simulation simulation) { }
+
+        public bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b, ref float speculativeMargin) => true;
+
+        public bool AllowContactGeneration(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB) => true;
+
+        public bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, ref TManifold manifold, out PairMaterialProperties pairMaterial) where TManifold : unmanaged, IContactManifold<TManifold>
+        {
+            pairMaterial.FrictionCoefficient = 1;
+            pairMaterial.MaximumRecoveryVelocity = 2;
+            pairMaterial.SpringSettings = new SpringSettings(30, 1);
+            return true;
+        }
+
+        public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ConvexContactManifold manifold)
+        {
+            return true;
+        }
+
+        public void Dispose() { }
+    }
+
+    public struct PoseIntegratorCallbacks : IPoseIntegratorCallbacks
+    {
+        public AngularIntegrationMode AngularIntegrationMode => AngularIntegrationMode.Nonconserving;
+
+        public bool AllowSubstepsForUnconstrainedBodies => false;
+
+        public bool IntegrateVelocityForKinematics => false;
+
+        private Vector3 gravity;
+
+        public PoseIntegratorCallbacks(Vector3 gravity)
+        {
+            this.gravity = gravity;
+        }
+
+        public void Initialize(Simulation simulation) { }
+
+        public void PrepareForIntegration(float dt) { }
+
+        public void IntegrateVelocity(
+            Vector<int> bodyIndices,
+            Vector3Wide position,
+            QuaternionWide orientation,
+            BodyInertiaWide localInertia,
+            Vector<int> integrationMask,
+            int workerIndex,
+            Vector<float> dt,
+            ref BodyVelocityWide velocity)
+        {
+            Vector3Wide.Broadcast(gravity, out var wideGravity);
+
+            for (int i = 0; i < Vector<int>.Count; i++)
+            {
+                if (integrationMask[i] != 0)
+                {
+                    Vector3Wide.Scale(wideGravity, new Vector<float>(dt[i]), out var gravityDt);
+                    Vector3Wide.Add(velocity.Linear, gravityDt, out velocity.Linear);
+                }
+            }
+        }
     }
     public void InitializeTwoMagnets()
     {
         float baseHeight = -(_simulationExtents.Y / 4.0f);
-        float gap = 1f;
+        float gap = 0.2f;
 
         float stabilizingMagnetHeight = 1f;
         float fixedMagnetHeight = 1f;
@@ -40,7 +139,7 @@ public class SimulationManager
         var levitatingMagnet = new Magnet(targetPosition, new Vector3(0, 1, 0), stabilizingMagnetHeight / 2, stabilizingMagnetHeight, 1.0f,
             stabilizingMagnetMass, MagnetType.Permanent, false);
 
-        Vector3 fixedPosition = new Vector3(0, targetPosition.Y + stabilizingMagnetHeight / 2 + fixedMagnetHeight / 2 + gap, 0);
+        Vector3 fixedPosition = new Vector3(0.3f, targetPosition.Y + stabilizingMagnetHeight / 2 + fixedMagnetHeight / 2 + gap, 0);
         var stabilizingMagnet = new Magnet(fixedPosition, new Vector3(0, 1, 0), fixedMagnetHeight / 2, fixedMagnetHeight, 1.0f, fixedMagnetMass,
             MagnetType.Permanent, true);
 
@@ -50,6 +149,8 @@ public class SimulationManager
     public void UpdateSimulation(SimulationParameters parameters)
     {
         SetSimulationParameters(parameters);
+        _simulation.Timestep(parameters.TimeStep);
+        ApplyMagneticForces();
 
         switch (_currentMode)
         {
@@ -66,6 +167,28 @@ public class SimulationManager
         }
 
         RecalculateFields();
+    }
+    public void ApplyMagneticForces()
+    {
+        for (int i = 0; i < _magnets.Count; i++)
+        {
+            for (int j = i + 1; j < _magnets.Count; j++)
+            {
+                var magnet1 = _magnets[i];
+                var magnet2 = _magnets[j];
+
+                if (_simulation.Bodies.BodyExists(magnet1.PhysicsEngineBodyHandle) &&
+                    _simulation.Bodies.BodyExists(magnet2.PhysicsEngineBodyHandle))
+                {
+                    var bodyReference1 = _simulation.Bodies.GetBodyReference(magnet1.PhysicsEngineBodyHandle);
+                    var bodyReference2 = _simulation.Bodies.GetBodyReference(magnet2.PhysicsEngineBodyHandle);
+
+                    Vector3 forceOnMagnet1 = CalculateDipoleDipoleForce(magnet1, magnet2);
+                    bodyReference1.ApplyLinearImpulse(forceOnMagnet1 * _timeStep);
+                    bodyReference2.ApplyLinearImpulse(-forceOnMagnet1 * _timeStep);
+                }
+            }
+        }
     }
     public void RecalculateFields()
     {
@@ -99,20 +222,20 @@ public class SimulationManager
             switch (_currentMode)
             {
                 case SimulationMode.VoxelBased:
-                {
-                    var divisionLength = _simulationExtents.X / _divisions;
-                    var voxelLength = divisionLength / _voxelsPerDivision;
+                    {
+                        var divisionLength = _simulationExtents.X / _divisions;
+                        var voxelLength = divisionLength / _voxelsPerDivision;
 
-                    foreach (var magnet in _magnets)
-                        GenerateVoxelsForMagnet(magnet, voxelLength);
-                    break;
-                }
+                        foreach (var magnet in _magnets)
+                            GenerateVoxelsForMagnet(magnet, voxelLength);
+                        break;
+                    }
                 case SimulationMode.DipoleApproximation:
-                {
-                    foreach (var magnet in _magnets)
-                        magnet.Voxels.Clear();
-                    break;
-                }
+                    {
+                        foreach (var magnet in _magnets)
+                            magnet.Voxels.Clear();
+                        break;
+                    }
             }
         }
     }
@@ -133,6 +256,18 @@ public class SimulationManager
     private void AddMagnet(Magnet magnet)
     {
         _magnets.Add(magnet);
+
+        var cylinder = new Cylinder(magnet.Radius, magnet.Length);
+        var cylinderIndex = _simulation.Shapes.Add(cylinder);
+
+        var bodyDescription = BodyDescription.CreateDynamic(
+            new RigidPose(magnet.Position, Quaternion.Identity),
+            new BodyInertia { InverseMass = 1f / magnet.Mass },
+            new CollidableDescription(cylinderIndex, 0.1f),
+            new BodyActivityDescription(0.01f));
+
+        var bodyHandle = _simulation.Bodies.Add(bodyDescription);
+        magnet.PhysicsEngineBodyHandle = bodyHandle;
     }
     private void GenerateVoxelsForMagnet(Magnet magnet, float voxelLength)
     {
@@ -163,9 +298,10 @@ public class SimulationManager
         {
             Vector3 totalForce = Vector3.Zero;
 
-            // Calculate the total force from all other magnets
             foreach (var sourceMagnet in _magnets.Where(m => m != targetMagnet))
             {
+                UpdateMagnetFromBepuSimulation(targetMagnet);
+
                 foreach (var targetVoxel in targetMagnet.Voxels)
                 {
                     Vector3 voxelForce = Vector3.Zero;
@@ -179,44 +315,37 @@ public class SimulationManager
                 }
             }
 
-            // Add gravity force
             Vector3 gravityForce = _gravity * targetMagnet.Mass;
             totalForce += gravityForce;
-
-            // Calculate acceleration
             Vector3 acceleration = totalForce / targetMagnet.Mass;
-
-            // Update velocity (Assuming targetMagnet.Velocity exists and is initialized)
             targetMagnet.Velocity += acceleration * _timeStep;
-
-            // Update position using velocity
             targetMagnet.Position += targetMagnet.Velocity * _timeStep;
         }
+    }
+    private void UpdateMagnetFromBepuSimulation(Magnet targetMagnet)
+    {
+        var bodyReference = _simulation.Bodies.GetBodyReference(targetMagnet.PhysicsEngineBodyHandle);
+        targetMagnet.Position = bodyReference.Pose.Position;
+        targetMagnet.Orientation = bodyReference.Pose.Orientation;
     }
     private void UpdateMagnetPositionsUsingDipoleApproximation()
     {
         foreach (var target in _magnets.Where(m => !m.IsFixed))
         {
+            UpdateMagnetFromBepuSimulation(target);
+
             Vector3 totalForce = Vector3.Zero;
 
-            // Calculate the total force from other magnets
             foreach (var source in _magnets.Where(m => m != target))
             {
                 Vector3 forceFromSource = CalculateDipoleDipoleForce(target, source);
                 totalForce += forceFromSource;
             }
 
-            // Add gravity force
             Vector3 gravityForce = _gravity * target.Mass;
             totalForce += gravityForce;
-
-            // Calculate acceleration
             Vector3 acceleration = totalForce / target.Mass;
-
-            // Update velocity (Assuming target.Velocity exists and is initialized)
             target.Velocity += acceleration * _timeStep;
-
-            // Update position using velocity
             target.Position += target.Velocity * _timeStep;
         }
     }
@@ -226,7 +355,7 @@ public class SimulationManager
         float rMagnitude = r.Length();
         Vector3 rHat = r / rMagnitude;
 
-        float mu0 = 4 * (float)Math.PI * 1e-7f;
+        float mu0 = 4 * (float)Math.PI * 1e-1f;
         float prefactor = (3 * mu0) / (4 * (float)Math.PI * (float)Math.Pow(rMagnitude, 4));
 
         float m1DotR = Vector3.Dot(source.Magnetization, rHat);
@@ -265,7 +394,7 @@ public class SimulationManager
         _gravityFieldVectors.Clear();
         Vector3 gravityDirection = Vector3.Normalize(_gravity);
         float divisionLength = _simulationExtents.X / _divisions;
-        float gravityMagnitude = Math.Min(9.81f, divisionLength);
+        float gravityMagnitude = Math.Min(_gravity.Y, divisionLength);
         float updateThreshold = 0.1f;
 
         List<FieldVector> updatedVectors = new List<FieldVector>();
@@ -310,7 +439,7 @@ public class SimulationManager
         float maxMagnitude = 0f;
         float minMagnitude = float.MaxValue;
         float updateThreshold = 0.1f;
-        
+
         List<FieldVector> updatedVectors = new List<FieldVector>();
 
         for (int x = 0; x < _divisions; x++)
@@ -368,17 +497,17 @@ public class SimulationManager
         switch (_currentMode)
         {
             case SimulationMode.DipoleApproximation:
-            {
-                Vector3 r = point - sourceMagnet.Position;
-                float mu0 = 4 * (float)Math.PI * 1e-7f;
-                float rMagnitude = r.Length();
+                {
+                    Vector3 r = point - sourceMagnet.Position;
+                    float mu0 = 4 * (float)Math.PI * 1e-7f;
+                    float rMagnitude = r.Length();
 
-                if (rMagnitude == 0) return Vector3.Zero;
+                    if (rMagnitude == 0) return Vector3.Zero;
 
-                totalField = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
-                             (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r - sourceMagnet.Magnetization * rMagnitude * rMagnitude);
-                break;
-            }
+                    totalField = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+                                 (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r - sourceMagnet.Magnetization * rMagnitude * rMagnitude);
+                    break;
+                }
             case SimulationMode.VoxelBased:
                 totalField = sourceMagnet.Voxels.Aggregate(totalField, (current, voxel) =>
                     current + CalculateFieldFromVoxel(voxel, point));
