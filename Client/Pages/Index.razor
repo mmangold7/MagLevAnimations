@@ -8,74 +8,91 @@
 <div class="simulation-container">
     <div class="canvas-container">
         <canvas id="threejs-canvas"></canvas>
+
         <div class="overlay-text">
             <p>Frame Rate: @FrameRate.ToString("0") FPS</p>
             <p>Frame Count: @FrameCount</p>
         </div>
     </div>
+
     <div class="control-panel @GetControlPanelClass()">
         <button id="toggleButton" @onclick="ToggleControlsVisibility">
             <span>@(AreControlsVisible ? "Hide Controls" : "☰")</span>
         </button>
+
         <hr class="control-divider" />
+
         <div class="controls" style="@(AreControlsVisible ? "display: block;" : "display:none;")">
             <button @onclick="TogglePaused">@(Paused ? "Play" : "Pause")</button>
             <button @onclick="RestartSimulation">Apply & Restart</button>
             <button @onclick="ToggleMagnetDrawingStyle">@(ShowCoils ? "Show Cylinders" : "Show Coils")</button>
             <button @onclick="ToggleGravityFieldVisibility">@(ShowGravityField ? "Hide Gravity Field" : "Show Gravity Field")</button>
             <button @onclick="ToggleMagneticFieldVisibility">@(ShowMagneticField ? "Hide Magnetic Field" : "Show Magnetic Field")</button>
+
             <div class="control-item">
-                <select id="visualizationDropdown" @bind="FieldDrawingType">
+                <select @bind="FieldDrawingType">
                     <option value="arrows">Arrow Helpers</option>
                     <option value="fieldLines">Field Lines</option>
                     <option value="colorMapping">Color Mapping</option>
                     <option value="volumeRendering">Volume Rendering</option>
                 </select>
             </div>
-            <button @onclick="ToggleApproximationMode">@(UseDipoleApproximation ? "Use Magnetized Voxels" : "Use Dipoles")</button>
+
+            <div class="control-item">
+                <select @bind="SimulationModeString">
+                    <option value="MultipleDipoles">Multiple Dipoles</option>
+                    <option value="DipoleApproximation">Single Dipole</option>
+                    <option value="VoxelBased">Voxels</option>
+                    <option value="Bepu">Bepu</option>
+                </select>
+            </div>
+
             <div class="slider">
                 <label for="maxFramesPerSecondSlider">Max FPS (Immediate): <span>@MaxFramesPerSecond.ToString("0")</span></label>
-                <input type="range" id="maxFramesPerSecondSlider" min="1" max="120" step="1" @bind="MaxFramesPerSecond" />
+                <input type="range" id="maxFramesPerSecondSlider" min="1" max="120" step="1" @bind="MaxFramesPerSecond"/>
             </div>
             <div class="slider">
                 <label for="timeStepSlider">Time-step: <span>@TimeStep.ToString("0.00")</span></label>
-                <input type="range" id="timeStepSlider" min="0.01" max="10" step="0.01" @bind="TimeStep" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="TimeStep" />
+                <input type="range" id="timeStepSlider" min="0.01" max="10" step="0.01" @bind="TimeStep"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="TimeStep"/>
             </div>
             <div class="slider">
                 <label for="gravityStepSlider">Gravity: <span>@Gravity.ToString("0.00")</span></label>
-                <input type="range" id="gravityStepSlider" min="-10" max="10" step="0.01" @bind="Gravity" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="Gravity" />
+                <input type="range" id="gravityStepSlider" min="-10" max="10" step="0.01" @bind="Gravity"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="Gravity"/>
             </div>
             <div class="slider">
                 <label for="ambientLightSlider">Ambient Light: <span>@AmbientLightLevel.ToString("0.00")</span></label>
-                <input type="range" id="ambientLightSlider" min="0" max="1" step="0.01" @bind="AmbientLightLevel" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="AmbientLightLevel" />
+                <input type="range" id="ambientLightSlider" min="0" max="1" step="0.01" @bind="AmbientLightLevel"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="AmbientLightLevel"/>
             </div>
             <div class="slider">
                 <label for="ceilingLightSlider">Ceiling Light: <span>@CeilingLightLevel.ToString("0.00")</span></label>
-                <input type="range" id="ceilingLightSlider" min="0" max="1" step="0.01" @bind="CeilingLightLevel" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="CeilingLightLevel" />
+                <input type="range" id="ceilingLightSlider" min="0" max="1" step="0.01" @bind="CeilingLightLevel"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="0.01" @bind="CeilingLightLevel"/>
             </div>
             <div class="slider">
                 <label for="extentStepSlider">Extent: <span>@SingleSimulationExtent.ToString("0.0")</span></label>
-                <input type="range" id="extentStepSlider" min="0.1" max="100" step="0.1" @bind="SingleSimulationExtent" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="0.1" @bind="SingleSimulationExtent" />
+                <input type="range" id="extentStepSlider" min="0.1" max="100" step="0.1" @bind="SingleSimulationExtent"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="0.1" @bind="SingleSimulationExtent"/>
             </div>
-           <div class="slider">
+            <div class="slider">
                 <label for="divisionsSlider">Divisions: <span>@Divisions.ToString("0")</span></label>
-                <input type="range" id="divisionsSlider" min="1" max="100" step="1" @bind="Divisions" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="1" @bind="Divisions" />
+                <input type="range" id="divisionsSlider" min="1" max="100" step="1" @bind="Divisions"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="1" @bind="Divisions"/>
             </div>
             <div class="slider">
                 <label for="voxelsSlider">Voxels Per Divisions: <span>@VoxelsPerDivision.ToString("0")</span></label>
-                <input type="range" id="voxelsSlider" min="1" max="100" step="1" @bind="VoxelsPerDivision" />
-                <input hidden="@(!ShowManualInputs)" type="number" step="1" @bind="VoxelsPerDivision" />
+                <input type="range" id="voxelsSlider" min="1" max="100" step="1" @bind="VoxelsPerDivision"/>
+                <input hidden="@(!ShowManualInputs)" type="number" step="1" @bind="VoxelsPerDivision"/>
             </div>
+
             <button @onclick="ToggleManualInputs">@(ShowManualInputs ? "Hide" : "Show") Manual Inputs</button>
-            <hr class="control-divider" />
+
+            <hr class="control-divider"/>
+
             <div class="control-item">
-                <button @onclick="InstallApp">Install Offline</button>
+                <button @onclick="PromptToInstallApp">Install Offline</button>
             </div>
         </div>
     </div>

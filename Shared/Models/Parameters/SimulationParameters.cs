@@ -1,6 +1,7 @@
 using System.Numerics;
+using Animations.Shared.Enums;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Models.Parameters;
 
 public class SimulationParameters
 {

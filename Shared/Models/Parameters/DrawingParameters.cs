@@ -1,4 +1,4 @@
-﻿namespace Animations.Shared;
+﻿namespace Animations.Shared.Models.Parameters;
 
 public class DrawingParameters
 {

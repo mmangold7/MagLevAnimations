@@ -1,8 +1,8 @@
 using System.Diagnostics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Extensions;
 
-public static class Profiling
+public static class ProfilingExtensions
 {
     // shell command for exposing api to network: "npx iisexpress-proxy https://localhost:7223 to 3000"
 
@@ -35,7 +35,6 @@ public static class Profiling
             }
             catch (Exception ex)
             {
-                // Log the exception if necessary
                 Console.WriteLine($"Exception in {logText}: {ex.Message}");
                 throw;
             }
@@ -66,7 +65,36 @@ public static class Profiling
             }
             catch (Exception ex)
             {
-                // Log the exception if necessary
+                Console.WriteLine($"Exception in {logText}: {ex.Message}");
+                throw;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                LogMethodTime(logText, stopwatch.ElapsedMilliseconds);
+            }
+        }
+        else
+        {
+            await action();
+        }
+    }
+
+    public static async ValueTask RunWithClockingLogAsync(Func<ValueTask> action, string logText = null)
+    {
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        if (ShouldLogMethodProfiles && IsDebug)
+        {
+            logText = string.IsNullOrEmpty(logText) ? GetMethodDescription(action) : logText;
+
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                await action();
+            }
+            catch (Exception ex)
+            {
                 Console.WriteLine($"Exception in {logText}: {ex.Message}");
                 throw;
             }

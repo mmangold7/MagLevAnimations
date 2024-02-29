@@ -1,3 +1,3 @@
-namespace Animations.Shared;
+namespace Animations.Shared.Enums;
 
 public enum MagnetType { Permanent, Electromagnet }
