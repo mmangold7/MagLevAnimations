@@ -12,6 +12,7 @@ public partial class Index : ComponentBase
     private CancellationTokenSource _simLoopCancel = new();
     private SimulationManager? _simulationManager;
     private bool _isVisualizationInitialized;
+    private CollisionMagnetSimulation? _collisionMagnetSimulator;
 
     private int Divisions { get; set; } = 10;
     private int VoxelsPerDivision { get; set; } = 10;
@@ -102,7 +103,7 @@ public partial class Index : ComponentBase
         ResetSimulator();
         await UpdateClientVisualization();
         await InvokeAsync(StateHasChanged);
-        await StartDrawSimulationLoop(_simulationManager, _simLoopCancel.Token);
+        await StartDrawSimulationLoop(_simLoopCancel.Token);
     }
     private void CancelSimulation()
     {
@@ -115,10 +116,12 @@ public partial class Index : ComponentBase
         FrameCount = 0;
         FrameRate = 0;
 
-        _simulationManager = new SimulationManager(GetSimulationParametersFromView());
-        _simulationManager.InitializeTwoMagnets();
+        //_simulationManager = new SimulationManager(GetSimulationParametersFromView());
+        _collisionMagnetSimulator = new CollisionMagnetSimulation(GetSimulationParametersFromView());
+        //_simulationManager.InitializeTwoMagnets();
+        _collisionMagnetSimulator.InitializeTwoMagnets();
     }
-    private async Task StartDrawSimulationLoop(SimulationManager simulationManager, CancellationToken simLoopCancelToken)
+    private async Task StartDrawSimulationLoop(CancellationToken simLoopCancelToken)
     {
         while (!simLoopCancelToken.IsCancellationRequested)
         {
@@ -129,7 +132,8 @@ public partial class Index : ComponentBase
                 await Task.Run(async () =>
                 {
                     var parameters = GetSimulationParametersFromView();
-                    simulationManager.UpdateSimulation(parameters);
+                    //simulationManager.UpdateSimulation(parameters);
+                    _collisionMagnetSimulator?.UpdateSimulation(parameters);
                     await UpdateClientVisualization();
                     await DelayUntilNextRequestedFrame(simLoopCancelToken);
                 }, simLoopCancelToken);
@@ -160,9 +164,10 @@ public partial class Index : ComponentBase
     }
     private async Task UpdateClientVisualization()
     {
-        if (_isVisualizationInitialized && _simulationManager != null)
+        //if (_isVisualizationInitialized && _simulationManager != null)
+        if (_isVisualizationInitialized && _collisionMagnetSimulator != null)
         {
-            var state = _simulationManager.GetSimulationState();
+            var state = _collisionMagnetSimulator.GetSimulationState();
             state.TimeSinceStart = FrameCount * TimeStep;
 
             var updateStopwatch = Stopwatch.StartNew();
