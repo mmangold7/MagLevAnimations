@@ -5,6 +5,7 @@ using Animations.Shared.Models.Parameters;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Numerics;
+using System.Text.Json;
 
 namespace Animations.Client.Pages;
 
@@ -17,10 +18,12 @@ public partial class Index : ComponentBase
 
     #region View-bound Properties
 
+    private bool DebugMode { get; set; }
+    private string DebugInformation { get; set; } = string.Empty;
     private int Divisions { get; set; } = 10;
     private int VoxelsPerDivision { get; set; } = 10;
     private float TimeStep { get; set; } = 0.05f;
-    private float Gravity { get; set; } = 0f;
+    private float Gravity { get; set; }
     private float SingleSimulationExtent { get; set; } = 10f;
     private bool ShowCoils { get; set; }
     private bool ShowGravityField { get; set; }
@@ -39,6 +42,11 @@ public partial class Index : ComponentBase
     #endregion
 
     #region View-bound Actions
+
+    private void ToggleDebugMode()
+    {
+        DebugMode = !DebugMode;
+    }
 
     private async Task ToggleMagnetDrawingStyle()
     {
@@ -186,22 +194,22 @@ public partial class Index : ComponentBase
 
     private async Task UpdateClientVisualization()
     {
-        if (_isVisualizationInitialized && _simulationManager != null)
-        {
-            var state = _simulationManager.GetSimulationState();
-            state.TimeSinceStart = FrameCount * TimeStep;
+        if (_simulationManager == null) return;
 
+        var state = _simulationManager.GetSimulationState();
+        state.TimeSinceStart = FrameCount * TimeStep;
+
+        if (DebugMode)
+            DebugInformation = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+        else if (_isVisualizationInitialized)
             await ProfilingExtensions.RunWithClockingLogAsync(
                 () => JsRuntime.InvokeVoidAsync(
                     "Animations.updateThreeJsScene",
                     state,
                     GetDrawingParametersFromView()),
                 "JsRuntime.InvokeVoidAsync(Animations.updateThreeJsScene");
-        }
 
-        await ProfilingExtensions.RunWithClockingLogAsync(
-            () => InvokeAsync(StateHasChanged),
-            "InvokeAsync(StateHasChanged)");
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task PromptToInstallApp()

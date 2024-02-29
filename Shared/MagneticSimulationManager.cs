@@ -558,9 +558,12 @@ public class MagneticSimulationManager
     private void CalculateGravityField()
     {
         _gravityFieldVectors.Clear();
-        Vector3 gravityDirection = Vector3.Normalize(_gravity);
+        Vector3 gravityDirection = _gravity == Vector3.Zero 
+            ? Vector3.Zero 
+            : Vector3.Normalize(_gravity);
+
         float divisionLength = _simulationExtents.X / _divisions;
-        float gravityMagnitude = Math.Min(_gravity.Y, divisionLength);
+        float gravityMagnitude = Math.Max(Math.Abs(_gravity.Y), divisionLength);
         float updateThreshold = 0.1f;
 
         List<FieldVector> updatedVectors = new List<FieldVector>();

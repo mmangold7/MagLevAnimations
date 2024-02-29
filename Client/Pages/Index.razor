@@ -1,30 +1,38 @@
 ﻿@page "/"
 
 @inject IJSRuntime JsRuntime
-@inject ILogger<Index> Logger
 
 <PageTitle>Magnet Simulator</PageTitle>
 
 <div class="simulation-container">
-    <div class="canvas-container">
-        <canvas id="threejs-canvas"></canvas>
-
-        <div class="overlay-text">
-            <p>Frame Rate: @FrameRate.ToString("0") FPS</p>
-            <p>Frame Count: @FrameCount</p>
+    @if (!DebugMode)
+    {
+        <div class="canvas-container">
+            <canvas id="threejs-canvas"></canvas>
+            <div class="overlay-text">
+                <p>Frame Rate: @FrameRate.ToString("0") FPS</p>
+                <p>Frame Count: @FrameCount</p>
+            </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="debug-info">
+            <pre>@DebugInformation</pre>
+        </div>
+    }
 
     <div class="control-panel @GetControlPanelClass()">
         <button id="toggleButton" @onclick="ToggleControlsVisibility">
             <span>@(AreControlsVisible ? "Hide Controls" : "☰")</span>
         </button>
 
-        <hr class="control-divider" />
+        <hr class="control-divider"/>
 
         <div class="controls" style="@(AreControlsVisible ? "display: block;" : "display:none;")">
             <button @onclick="TogglePaused">@(Paused ? "Play" : "Pause")</button>
             <button @onclick="RestartSimulation">Apply & Restart</button>
+            <button @onclick="ToggleDebugMode">@("Toggle Debug")</button>
             <button @onclick="ToggleMagnetDrawingStyle">@(ShowCoils ? "Show Cylinders" : "Show Coils")</button>
             <button @onclick="ToggleGravityFieldVisibility">@(ShowGravityField ? "Hide Gravity Field" : "Show Gravity Field")</button>
             <button @onclick="ToggleMagneticFieldVisibility">@(ShowMagneticField ? "Hide Magnetic Field" : "Show Magnetic Field")</button>
