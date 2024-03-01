@@ -509,7 +509,12 @@ function drawColorMappedArrow(vector, fieldType) {
     let arrowHelper = simulationGroup.getObjectByName(vectorName);
     const arrowDirection = new three.Vector3(vector.direction.x, vector.direction.y, vector.direction.z).normalize();
     const arrowPosition = new three.Vector3(vector.position.x, vector.position.y + halfBoundingBoxHeight, vector.position.z);
-    const arrowLength = vector.magnitude;
+
+    //old
+    //const arrowLength = vector.magnitude;
+    //new
+    const scaledMagnitude = Math.log(1 + vector.magnitude);
+    const arrowLength = Math.max(scaledMagnitude, 0.1);
 
     const magnitudeNormalized = Math.min(vector.magnitude, 1);
     const colorScale = new three.Color().setHSL(0.7 * (1 - magnitudeNormalized), 1, 0.5);

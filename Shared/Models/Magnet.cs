@@ -76,35 +76,38 @@ public class Magnet
         Orientation = Quaternion.Normalize(Orientation);
     }
 
-    public Vector3 ComputeFieldAtPoint(Vector3 point)
+    public Vector3 ComputeMultipleDipoleFieldAtPoint(Vector3 point)
     {
-        float mu0 = 4 * (float)Math.PI * 1e-1f;
-        Vector3 field = Vector3.Zero;
-        float dL = Length / NumElementsInDiscreteApproximation;
+        var totalField = Vector3.Zero;
+        var dL = Length / NumElementsInDiscreteApproximation;
+
+        var segmentMagnetization = Magnetization / NumElementsInDiscreteApproximation;
 
         for (int i = 0; i < NumElementsInDiscreteApproximation; i++)
         {
-            Vector3 elementPos = Position + Vector3.Transform(new Vector3(0, 0, i * dL - Length / 2 + dL / 2), Orientation.ToMatrix());
-            Vector3 r = point - elementPos;
-            float rMagnitude = r.Length();
-            float preFactor = 3 * mu0 / (4 * (float)Math.PI * (float)Math.Pow(rMagnitude, 4));
-            float distance = r.Length();
+            var segmentCenter = Position + Vector3.Transform(new Vector3(0, 0, i * dL - Length / 2 + dL / 2), Orientation.ToMatrix());
 
-            if (distance < 1e-6) continue;
+            var fieldContribution = CalculateSingleDipoleFieldAtPoint(segmentCenter, segmentMagnetization, point);
 
-            Vector3 dB = (Magnetization * dL * 3.0f * Vector3.Dot(Vector3.Transform(Vector3.UnitZ, Orientation.ToMatrix()), r) * r / (distance * distance * distance) - Magnetization * Vector3.Transform(Vector3.UnitZ, Orientation.ToMatrix())) / (distance * distance);
-            dB *= preFactor;
-            field += dB;
+            totalField += fieldContribution;
         }
 
-        return field;
+        return totalField;
     }
 
-    public Vector3 ComputeForceOnMagnet(Magnet other)
+    private static Vector3 CalculateSingleDipoleFieldAtPoint(Vector3 dipolePosition, Vector3 dipoleMagnetization, Vector3 point)
     {
-        Vector3 fieldAtOtherMagnet = ComputeFieldAtPoint(other.Position);
-        return other.Magnetization * fieldAtOtherMagnet;
+        Vector3 r = point - dipolePosition;
+        var mu0 = 4 * (float)Math.PI * 1e-7f;
+        var rMagnitude = r.Length();
+
+        if (rMagnitude == 0) return Vector3.Zero;
+
+        return (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+               (3 * Vector3.Dot(dipoleMagnetization, r) * r - dipoleMagnetization * rMagnitude * rMagnitude);
     }
+
+    public Vector3 ComputeForceOnMagnet(Magnet other) => other.Magnetization * ComputeMultipleDipoleFieldAtPoint(other.Position);
 
     public Vector3 ComputeTorque(Magnet other)
     {
@@ -114,7 +117,7 @@ public class Magnet
         for (int i = 0; i < NumElementsInDiscreteApproximation; i++)
         {
             Vector3 elementPos = Position + Vector3.Transform(new Vector3(0, 0, i * dL - Length / 2 + dL / 2), Orientation.ToMatrix());
-            Vector3 localField = other.ComputeFieldAtPoint(elementPos);
+            Vector3 localField = other.ComputeMultipleDipoleFieldAtPoint(elementPos);
             Vector3 dT = Vector3.Cross(Magnetization * dL, localField);
             torque += dT;
         }

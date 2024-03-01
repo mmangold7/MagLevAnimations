@@ -14,6 +14,10 @@ namespace Animations.Shared;
 
 public class MagneticSimulationManager
 {
+    private const float MagnetHeight = 1f;
+    private const float MagnetRadius = 0.5f;
+    private const float MagnetMass = 0.01f;
+    private const float GapBetweenMagnets = 0.2f;
     private bool _showGravityField;
     private bool _showMagneticField;
     private int _divisions;
@@ -28,6 +32,24 @@ public class MagneticSimulationManager
     private readonly List<FieldVector> _magneticFieldVectors = new();
     private readonly Dictionary<int, FieldVector> _previousMagneticFieldVectors = new();
     private readonly Dictionary<int, FieldVector> _previousGravityFieldVectors = new();
+
+    private Vector3 GetBaseMagnetPosition()
+    {
+        var baseHeight = -(_simulationExtents.Y / 4.0f);
+        return new Vector3(0, baseHeight, 0);
+    }
+
+    private Vector3 GetLevitatingMagnetPosition()
+    {
+        var basePosition = GetBaseMagnetPosition();
+        return basePosition with { Y = basePosition.Y + MagnetHeight / 2 + GapBetweenMagnets };
+    }
+
+    private Vector3 GetFixedMagnetPosition()
+    {
+        var levitatingPosition = GetLevitatingMagnetPosition();
+        return new Vector3(levitatingPosition.X + 0.3f, levitatingPosition.Y + MagnetHeight + GapBetweenMagnets, levitatingPosition.Z);
+    }
 
     public MagneticSimulationManager(SimulationParameters parameters)
     {
@@ -64,34 +86,13 @@ public class MagneticSimulationManager
 
     public void InitializeTwoMagnets()
     {
-        var baseHeight = -(_simulationExtents.Y / 4.0f);
-        var gap = 0.2f;
+        var levitatingPosition = GetLevitatingMagnetPosition();
+        var levitatingMagnet = new Magnet(levitatingPosition, Vector3.UnitY,
+            MagnetMass, MagnetRadius, MagnetHeight, false, MagnetType.Permanent);
 
-        var stabilizingMagnetHeight = 1f;
-        var fixedMagnetHeight = 1f;
-
-        var stabilizingMagnetMass = .01f;
-        var fixedMagnetMass = .01f;
-
-        var targetPosition = new Vector3(0, baseHeight + stabilizingMagnetHeight / 2 + gap, 0);
-        var levitatingMagnet = new Magnet(
-            targetPosition,
-            new Vector3(0, 1, 0),
-            stabilizingMagnetMass,
-            stabilizingMagnetHeight / 2,
-            stabilizingMagnetHeight,
-            false,
-            MagnetType.Permanent);
-
-        var fixedPosition = new Vector3(0.3f, targetPosition.Y + stabilizingMagnetHeight / 2 + fixedMagnetHeight / 2 + gap, 0);
-        var stabilizingMagnet = new Magnet(
-            fixedPosition,
-            new Vector3(0, 1, 0),
-            fixedMagnetMass,
-            fixedMagnetHeight / 2,
-            fixedMagnetHeight,
-            true,
-            MagnetType.Permanent);
+        var fixedPosition = GetFixedMagnetPosition();
+        var stabilizingMagnet = new Magnet(fixedPosition, Vector3.UnitY,
+            MagnetMass, MagnetRadius, MagnetHeight, true, MagnetType.Permanent);
 
         AddMagnet(levitatingMagnet);
         AddMagnet(stabilizingMagnet);
@@ -178,18 +179,21 @@ public class MagneticSimulationManager
 
     private void AddMagnetsToBepuPhysicsSimulator(Simulation bepuSim)
     {
-        //todo make this dynamic based on what the magnets are defined as elsewhere
-        var cylinder = new Cylinder(1f, 0.5f); // 1 meter tall, 0.5 meters in radius.
-        var cylinderInertia = cylinder.ComputeInertia(10); // 10 kg mass.
-        var cylinderIndex = bepuSim.Shapes.Add(cylinder);
+        foreach (var magnet in _magnets)
+        {
+            var cylinder = new Cylinder(MagnetRadius, MagnetHeight);
+            var cylinderIndex = bepuSim.Shapes.Add(cylinder);
+            var cylinderInertia = cylinder.ComputeInertia(MagnetMass);
 
-        var bodyDescription1 = BodyDescription.CreateDynamic(new Vector3(0, 5, 0), cylinderInertia,
-            new CollidableDescription(cylinderIndex, 0.1f), new BodyActivityDescription(0.01f));
-        bepuSim.Bodies.Add(bodyDescription1);
+            var bodyDescription = BodyDescription.CreateDynamic(
+                magnet.Position,
+                cylinderInertia,
+                new CollidableDescription(cylinderIndex, 0.1f),
+                new BodyActivityDescription(0.01f));
 
-        var bodyDescription2 = BodyDescription.CreateDynamic(new Vector3(0, 10, 0), cylinderInertia,
-            new CollidableDescription(cylinderIndex, 0.1f), new BodyActivityDescription(0.01f));
-        bepuSim.Bodies.Add(bodyDescription2);
+            var bodyHandle = bepuSim.Bodies.Add(bodyDescription);
+            magnet.PhysicsEngineBodyHandle = bodyHandle;
+        }
     }
 
     private Simulation CreateBepuPhysicsSimulator()
@@ -261,9 +265,9 @@ public class MagneticSimulationManager
     {
         public AngularIntegrationMode AngularIntegrationMode => AngularIntegrationMode.Nonconserving;
 
-        public readonly bool AllowSubstepsForUnconstrainedBodies => false;
+        public bool AllowSubstepsForUnconstrainedBodies => false;
 
-        public readonly bool IntegrateVelocityForKinematics => false;
+        public bool IntegrateVelocityForKinematics => false;
 
         private readonly Vector3 _gravity;
 
@@ -316,7 +320,7 @@ public class MagneticSimulationManager
         switch (_currentMode)
         {
             case SimulationMode.MultipleDipoles:
-                ProfilingExtensions.RunWithClockingLog(UpdateMagnetsPositionsUsingMultiDipoleApproximation);
+                ProfilingExtensions.RunWithClockingLog(UpdateMagnetsPositionsUsingMultipleDipoleApproximation);
                 break;
             case SimulationMode.DipoleApproximation:
                 ProfilingExtensions.RunWithClockingLog(UpdateMagnetPositionsUsingDipoleApproximation);
@@ -333,7 +337,7 @@ public class MagneticSimulationManager
         }
     }
 
-    private void UpdateMagnetsPositionsUsingMultiDipoleApproximation()
+    private void UpdateMagnetsPositionsUsingMultipleDipoleApproximation()
     {
         foreach (var target in _magnets.Where(m => !m.IsFixed))
         {
@@ -558,34 +562,32 @@ public class MagneticSimulationManager
     private void CalculateGravityField()
     {
         _gravityFieldVectors.Clear();
-        Vector3 gravityDirection = _gravity == Vector3.Zero 
-            ? Vector3.Zero 
+        Vector3 gravityDirection = _gravity == Vector3.Zero
+            ? Vector3.Zero
             : Vector3.Normalize(_gravity);
 
         float divisionLength = _simulationExtents.X / _divisions;
-        float gravityMagnitude = Math.Max(Math.Abs(_gravity.Y), divisionLength);
+        float gravityMagnitude = Math.Min(_gravity.Y, divisionLength);
         float updateThreshold = 0.1f;
 
         List<FieldVector> updatedVectors = new List<FieldVector>();
 
-        for (int x = 0; x < _divisions; x++)
+        for (var x = 0; x < _divisions; x++)
         {
-            for (int y = 0; y < _divisions; y++)
+            for (var y = 0; y < _divisions; y++)
             {
-                for (int z = 0; z < _divisions; z++)
+                for (var z = 0; z < _divisions; z++)
                 {
-                    Vector3 position = CalculatePositionInSpace(x, y, z, _divisions);
-                    int flatIndex = x * (int)_simulationExtents.Y * (int)_simulationExtents.Z + y * (int)_simulationExtents.Z + z;
-                    FieldVector newVector = new FieldVector(position, gravityDirection, gravityMagnitude, flatIndex);
+                    var position = CalculatePositionInSpace(x, y, z, _divisions);
+                    var flatIndex = x * (int)_simulationExtents.Y * (int)_simulationExtents.Z + y * (int)_simulationExtents.Z + z;
+                    var newVector = new FieldVector(position, gravityDirection, gravityMagnitude, flatIndex);
 
                     if (_previousGravityFieldVectors.ContainsKey(flatIndex))
                     {
-                        FieldVector previousVector = _previousGravityFieldVectors[flatIndex];
-                        if (Math.Abs(newVector.Magnitude - previousVector.Magnitude) > updateThreshold)
-                        {
-                            updatedVectors.Add(newVector);
-                            _previousGravityFieldVectors[flatIndex] = newVector;
-                        }
+                        var previousVector = _previousGravityFieldVectors[flatIndex];
+                        if (!(Math.Abs(newVector.Magnitude - previousVector.Magnitude) > updateThreshold)) continue;
+                        updatedVectors.Add(newVector);
+                        _previousGravityFieldVectors[flatIndex] = newVector;
                     }
                     else
                     {
@@ -623,7 +625,7 @@ public class MagneticSimulationManager
 
                     foreach (var magnet in _magnets)
                     {
-                        Vector3 magneticField = magnet.ComputeFieldAtPoint(position);
+                        Vector3 magneticField = CalculateFieldAtPoint(magnet, position);
                         totalMagneticField += magneticField;
                     }
 
@@ -655,22 +657,70 @@ public class MagneticSimulationManager
         foreach (var vector in updatedVectors)
         {
             float scaledMagnitude = ScaleMagnitude(vector.Magnitude, minMagnitude, maxMagnitude, divisionLength * 0.1f, divisionLength);
-            Vector3 normalizedDirection = Vector3.Normalize(vector.Direction) * scaledMagnitude;
+            Vector3 normalizedDirection = Vector3.Normalize(vector.Direction) * scaledMagnitude; // Ensure this line is present and correct
 
             _magneticFieldVectors.Add(new FieldVector(vector.Position, normalizedDirection, scaledMagnitude, vector.Index));
         }
     }
 
-    private float ScaleMagnitude(float value, float min, float max, float newMin, float newMax)
+    private Vector3 CalculateFieldAtPoint(Magnet sourceMagnet, Vector3 point)
     {
-        if (max - min == 0) return newMin;
-        return (value - min) / (max - min) * (newMax - newMin) + newMin;
+        switch (_currentMode)
+        {
+            case SimulationMode.DipoleApproximation:
+                return CalculateSingleDipoleFieldAtPoint(sourceMagnet, point);
+            case SimulationMode.VoxelBased:
+                var totalField = Vector3.Zero;
+                foreach (var voxel in sourceMagnet.VoxelsForApproximation)
+                    totalField += CalculateFieldFromVoxel(voxel, point);
+                return totalField;
+            case SimulationMode.MultipleDipoles:
+                return sourceMagnet.ComputeMultipleDipoleFieldAtPoint(point);
+            case SimulationMode.Bepu:
+                return CalculateSingleDipoleFieldAtPoint(sourceMagnet, point);
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
+    private static Vector3 CalculateSingleDipoleFieldAtPoint(Magnet sourceMagnet, Vector3 point)
+    {
+        Vector3 r = point - sourceMagnet.Position;
+        var mu0 = 4 * (float)Math.PI * 1e-7f;
+        var rMagnitude = r.Length();
+
+        if (rMagnitude == 0) return Vector3.Zero;
+
+        return (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+                     (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r -
+                      sourceMagnet.Magnetization * rMagnitude * rMagnitude);
+    }
+
+    private Vector3 CalculateFieldFromVoxel(Voxel voxel, Vector3 point)
+    {
+        Vector3 r = point - voxel.Position;
+        float mu0 = 4 * (float)Math.PI * 1e-7f;
+        float rMagnitude = r.Length();
+
+        if (rMagnitude == 0) return Vector3.Zero;
+
+        Vector3 field = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+                        (3 * Vector3.Dot(voxel.Magnetization, r) * r - voxel.Magnetization * rMagnitude * rMagnitude);
+
+        return field;
+    }
+
+    private static float ScaleMagnitude(float value, float min, float max, float minScale, float maxScale)
+    {
+        var range = max - min;
+        if (range == 0) return minScale;
+        return (value - min) / (range) * (maxScale - minScale) + minScale;
     }
 
     private Vector3 CalculatePositionInSpace(int x, int y, int z, int divisions)
     {
-        float stepSize = _simulationExtents.X / divisions;
-        float offset = stepSize / 2.0f;
+        var stepSize = _simulationExtents.X / divisions;
+        var offset = stepSize / 2.0f;
 
         return new Vector3(
             (x * stepSize + offset) - (_simulationExtents.X / 2.0f),
