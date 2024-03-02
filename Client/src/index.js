@@ -2,10 +2,24 @@
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { elementSpectra, getElementSymbol, fraunhoferLines } from './elementSpectra';
 
-var scene, camera, renderer, controls;
+var scene, camera, renderer, controls, fontLoader;
 var simulationGroup, halfBoundingBoxHeight;
 var analogClock, digitalClock, ambientLight, ceilingLight;
+
+const littleStripeWidth = 20;
+const littleStripeHeight = 5;
+const labelHeight = 5;
+const bigCellPadding = 2;
+const littleCellPadding = 2;
+const cellWidth = littleStripeWidth + littleCellPadding;
+const cellHeight = littleStripeHeight + labelHeight + littleCellPadding;
+const wallWidth = 200;
+const wallHeight = 80;
+const bigStripeHeight = wallHeight / 3;
+const numColumns = Math.floor(wallWidth / cellWidth);
+const numRows = Math.floor(bigStripeHeight / cellHeight);
 
 //public api
 function initializeThreeJs(inputDimensions, drawingParameters) {
@@ -22,13 +36,23 @@ function initializeThreeJs(inputDimensions, drawingParameters) {
     camera.position.set(0, 1, 2);
     camera.lookAt(new three.Vector3(0, 0, 0));
 
+    fontLoader = new FontLoader();
+
     addLights(drawingParameters.ceilingLightLevel, drawingParameters.ambientLightLevel);
     addFloor();
     addWalls();
     addCeiling();
 
     addTable();
-    addBackWallRainbow();
+
+    //addBackWallRainbow();
+
+    const visibleSpectrumTexture = generateVisibleSpectrumTexture();
+    addSpectrumStripe(visibleSpectrumTexture, 0); // Visible spectrum on top
+    const solarSpectrumTexture = generateSolarSpectrumTexture();
+    addSpectrumStripe(solarSpectrumTexture, 1); // Solar spectrum in the middle
+    drawElementSpectra();
+
     addDigitalClock();
     addAnalogClock();
 
@@ -164,7 +188,7 @@ function addFloor() {
         for (let z = 0; z < tilesPerSide; z++) {
             const isWhite = (x + z) % 2 === 0;
             const floorMaterial = new three.MeshLambertMaterial({
-                color: isWhite ? 0x9F9F9F : 0x000000,
+                color: isWhite ? 0xFFFFFF : 0x000000,
                 side: three.DoubleSide
             });
 
@@ -178,7 +202,7 @@ function addFloor() {
 }
 function addWalls() {
     const wallMaterial = new three.MeshLambertMaterial({
-        color: 0xFFFFFF,
+        color: 0x555555,
         side: three.DoubleSide
     });
 
@@ -210,7 +234,7 @@ function addCeiling() {
 }
 function addTable() {
     const tableMaterial = new three.MeshStandardMaterial({
-        color: 0xBFBFBF,
+        color: 0x202020,
         roughness: 0.5,
         metalness: 0.1
     });
@@ -219,7 +243,7 @@ function addTable() {
     scene.add(tableTop);
 
     const legMaterial = new three.MeshStandardMaterial({
-        color: 0x505050,
+        color: 0x909090,
         roughness: 0.5,
         metalness: 0.1
     });
@@ -248,6 +272,202 @@ function addBackWallRainbow() {
     });
 }
 
+//drawing spectra
+function addSpectrumStripe(texture, stripeIndex) {
+    const paddedWidth = wallWidth - 2 * bigCellPadding;
+    const paddedHeight = bigStripeHeight - 2 * bigCellPadding;
+    const geometry = new three.PlaneGeometry(paddedWidth, paddedHeight);
+    const material = new three.MeshBasicMaterial({ map: texture, side: three.DoubleSide });
+    const plane = new three.Mesh(geometry, material);
+    const yPos = (wallHeight) - (bigStripeHeight / 2) - (stripeIndex * bigStripeHeight);
+    plane.position.set(0, yPos, -99.9);
+    plane.scale.x = -1;
+    scene.add(plane);
+}
+function drawElementSpectra() {
+    elementSpectra.forEach((element, index) => {
+        const column = index % numColumns;
+        const row = Math.floor(index / numColumns);
+        if (row < numRows) {
+            addElementSpectrumStripe(element, column, row);
+        }
+    });
+}
+function addElementSpectrumStripe(element, column, row) {
+    const xOffset = -wallWidth / 2 + cellWidth / 2;
+    const yOffset = (wallHeight) - (bigStripeHeight / 2) - (2 * bigStripeHeight);
+
+    const xPos = xOffset + column * cellWidth;
+    const yPos = yOffset + row * cellHeight;
+
+    const geometry = new three.PlaneGeometry(littleStripeWidth, littleStripeHeight);
+    const texture = generateElementSpectrumTexture(element);
+    const material = new three.MeshBasicMaterial({ map: texture, side: three.DoubleSide });
+    const plane = new three.Mesh(geometry, material);
+    plane.position.set(xPos, yPos - labelHeight / 2, -99.9);
+    plane.scale.x = -1;
+    scene.add(plane);
+
+    const elementSymbol = getElementSymbol(element.name);
+    addElementLabel(elementSymbol, xPos, yPos - littleStripeHeight - labelHeight);
+}
+function generateVisibleSpectrumTexture() {
+    const width = 512;
+    const height = 1;
+    const size = width * height;
+    const data = new Uint8Array(4 * size);
+
+    for (let i = 0; i < size; i++) {
+        const wavelength = 380 + (i / width) * (700 - 380);
+        const rgb = wavelengthToRgb(wavelength);
+        const stride = i * 4;
+        data[stride] = rgb.r;
+        data[stride + 1] = rgb.g;
+        data[stride + 2] = rgb.b;
+        data[stride + 3] = 255;
+    }
+
+    const texture = new three.DataTexture(data, width, height, three.RGBAFormat);
+    texture.needsUpdate = true;
+    return texture;
+}
+function generateSolarSpectrumTexture() {
+    const width = 512;
+    const height = 1;
+    const size = width * height;
+    const data = new Uint8Array(4 * size);
+
+    for (let i = 0; i < size; i++) {
+        const position = i / width;
+        const wavelength = 380 + position * (700 - 380);
+
+        const isFraunhoferLine = fraunhoferLines.some(lineWavelength =>
+            Math.abs(wavelength - lineWavelength) < ((700 - 380) / width)
+        );
+
+        const rgb = isFraunhoferLine ? { r: 0, g: 0, b: 0 } : wavelengthToRgb(wavelength);
+        const stride = i * 4;
+        data[stride] = rgb.r;
+        data[stride + 1] = rgb.g;
+        data[stride + 2] = rgb.b;
+        data[stride + 3] = 255;
+    }
+
+    const texture = new three.DataTexture(data, width, height, three.RGBAFormat);
+    texture.needsUpdate = true;
+    return texture;
+}
+function generateElementSpectrumTexture(element) {
+    const width = 512;
+    const height = 1;
+    const size = width * height;
+    const data = new Uint8Array(4 * size);
+
+    for (let i = 0; i < size; i++) {
+        const stride = i * 4;
+        data[stride] = 0; // R
+        data[stride + 1] = 0; // G
+        data[stride + 2] = 0; // B
+        data[stride + 3] = 255; // A
+    }
+
+    element.lines.forEach(line => {
+        const wavelength = line[0];
+        const intensity = line[1];
+
+        const position = Math.floor(((wavelength - 380) / (780 - 380)) * width);
+
+        if (position >= 0 && position < width) {
+            const rgb = wavelengthToRgb(wavelength);
+            const stride = position * 4;
+
+            data[stride] = rgb.r;
+            data[stride + 1] = rgb.g;
+            data[stride + 2] = rgb.b;
+            data[stride + 2] = 255 * intensity;
+        }
+    });
+
+    const texture = new three.DataTexture(data, width, height, three.RGBAFormat);
+    texture.needsUpdate = true;
+    return texture;
+}
+function wavelengthToRgb(wavelength) {
+    let gamma = 0.8;
+    let intensityMax = 255;
+    let factor;
+    let red, green, blue;
+
+    if ((wavelength >= 380) && (wavelength < 440)) {
+        red = -(wavelength - 440) / (440 - 380);
+        green = 0.0;
+        blue = 1.0;
+    } else if ((wavelength >= 440) && (wavelength < 490)) {
+        red = 0.0;
+        green = (wavelength - 440) / (490 - 440);
+        blue = 1.0;
+    } else if ((wavelength >= 490) && (wavelength < 510)) {
+        red = 0.0;
+        green = 1.0;
+        blue = -(wavelength - 510) / (510 - 490);
+    } else if ((wavelength >= 510) && (wavelength < 580)) {
+        red = (wavelength - 510) / (580 - 510);
+        green = 1.0;
+        blue = 0.0;
+    } else if ((wavelength >= 580) && (wavelength < 645)) {
+        red = 1.0;
+        green = -(wavelength - 645) / (645 - 580);
+        blue = 0.0;
+    } else if ((wavelength >= 645) && (wavelength <= 780)) {
+        red = 1.0;
+        green = 0.0;
+        blue = 0.0;
+    } else {
+        red = 0.0;
+        green = 0.0;
+        blue = 0.0;
+    }
+
+    // Let the intensity fall off near the vision limits
+    if ((wavelength >= 380) && (wavelength < 420)) {
+        factor = 0.3 + 0.7 * (wavelength - 380) / (420 - 380);
+    } else if ((wavelength >= 420) && (wavelength < 645)) {
+        factor = 1.0;
+    } else if ((wavelength >= 645) && (wavelength <= 780)) {
+        factor = 0.3 + 0.7 * (780 - wavelength) / (780 - 645);
+    } else {
+        factor = 0.0;
+    }
+
+    const rgb = {
+        r: adjustColor(red, factor, intensityMax, gamma),
+        g: adjustColor(green, factor, intensityMax, gamma),
+        b: adjustColor(blue, factor, intensityMax, gamma)
+    };
+
+    return rgb;
+}
+function adjustColor(color, factor, intensityMax, gamma) {
+    if (color === 0.0) {
+        return 0;
+    } else {
+        return Math.round(intensityMax * Math.pow(color * factor, gamma));
+    }
+}
+function addElementLabel(text, xPos, yPos) {
+    fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+        const textGeo = new TextGeometry(text, {
+            font: font,
+            size: 2,
+            height: 0.1
+        });
+        const textMaterial = new three.MeshBasicMaterial({ color: 0xffffff });
+        const mesh = new three.Mesh(textGeo, textMaterial);
+        mesh.position.set(xPos, yPos, -99.8);
+        scene.add(mesh);
+    });
+}
+
 //drawing clocks
 function addDigitalClock() {
     digitalClock = new three.Group();
@@ -256,9 +476,7 @@ function addDigitalClock() {
         console.warn('Font not loaded yet.');
     };
 
-    const loader = new FontLoader();
-
-    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+    fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
         const geometry = new TextGeometry('00:00:00', {
             font: font,
             size: 10,
@@ -274,32 +492,26 @@ function addDigitalClock() {
         const mesh = new three.Mesh(geometry, material);
         mesh.position.set(-10, 0, 0);
         mesh.rotation.y = Math.PI / 2;
-        mesh.position.set(-95, 40 - 5, 50 + 20);
+        mesh.position.set(-99.5, 40 - 5, 50 + 20);
         scene.add(mesh);
 
         digitalClock.updateTime = function (simulationTime) {
-            // Ensure simulationTime is in milliseconds for JavaScript Date object
             const time = new Date(simulationTime * 1000);
 
-            // Get hours, minutes, and seconds
-            let hours = time.getUTCHours(); // Use getUTCHours to avoid timezone offset
+            let hours = time.getUTCHours();
             let minutes = time.getUTCMinutes();
             let seconds = time.getUTCSeconds();
 
-            // Convert to 12-hour format if needed
             if (hours > 12) {
                 hours -= 12;
             }
 
-            // Pad single digits with leading zero
             hours = String(hours).padStart(2, '0');
             minutes = String(minutes).padStart(2, '0');
             seconds = String(seconds).padStart(2, '0');
 
-            // Combine into a time string
             const timeString = `${hours}:${minutes}:${seconds}`;
 
-            // Update the geometry of the mesh with the new time string
             mesh.geometry = new TextGeometry(timeString, {
                 font: font,
                 size: 10,

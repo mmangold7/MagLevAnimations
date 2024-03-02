@@ -95,6 +95,24 @@ public class Magnet
         return totalField;
     }
 
+    public Vector3 CalculateMagneticFieldAtPoint(Vector3 point)
+    {
+        Vector3 r = point - Position;
+        float rMagnitude = r.Length();
+        Vector3 rHat = r / rMagnitude;
+
+        float mu0 = 4 * (float)Math.PI * 1e-7f;  // Use the correct value for mu0
+        Vector3 B = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+                    (3 * Vector3.Dot(Magnetization, rHat) * rHat - Magnetization);
+
+        return B;
+    }
+
+    public Vector3 CalculateTorque(Vector3 externalField)
+    {
+        return Vector3.Cross(Magnetization, externalField);
+    }
+
     private static Vector3 CalculateSingleDipoleFieldAtPoint(Vector3 dipolePosition, Vector3 dipoleMagnetization, Vector3 point)
     {
         Vector3 r = point - dipolePosition;

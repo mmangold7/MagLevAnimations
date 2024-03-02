@@ -32,7 +32,15 @@
 .debug-info {
     position: relative;
     width: 100%;
-    height: 70vh;
+    background-color: black;
+    color: white;
+    overflow-y: auto; /* To make sure it's scrollable if content overflows */
+    font-family: monospace; /* Gives a more 'debug' feel */
+}
+
+.debug-info pre {
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap; /* Ensures that text does not overflow */
 }
 
 #threejs-canvas {

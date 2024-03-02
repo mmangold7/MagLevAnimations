@@ -43,10 +43,7 @@ public partial class Index : ComponentBase
 
     #region View-bound Actions
 
-    private void ToggleDebugMode()
-    {
-        DebugMode = !DebugMode;
-    }
+    private void ToggleDebugMode() => DebugMode = !DebugMode;
 
     private async Task ToggleMagnetDrawingStyle()
     {

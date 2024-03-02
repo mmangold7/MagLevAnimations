@@ -17,7 +17,7 @@ public class MagneticSimulationManager
     private const float MagnetHeight = 1f;
     private const float MagnetRadius = 0.5f;
     private const float MagnetMass = 0.01f;
-    private const float GapBetweenMagnets = 0.2f;
+    private const float GapBetweenMagnets = 0.1f;
     private bool _showGravityField;
     private bool _showMagneticField;
     private int _divisions;
@@ -48,7 +48,7 @@ public class MagneticSimulationManager
     private Vector3 GetFixedMagnetPosition()
     {
         var levitatingPosition = GetLevitatingMagnetPosition();
-        return new Vector3(levitatingPosition.X + 0.3f, levitatingPosition.Y + MagnetHeight + GapBetweenMagnets, levitatingPosition.Z);
+        return new Vector3(levitatingPosition.X + 0.3f, levitatingPosition.Y + MagnetHeight + GapBetweenMagnets, levitatingPosition.Z + 0.3f);
     }
 
     public MagneticSimulationManager(SimulationParameters parameters)
@@ -64,7 +64,8 @@ public class MagneticSimulationManager
         {
             Magnets = _magnets.Select(ConvertMagnetToJsObject).ToArray(),
             GravityFieldData = _showGravityField ? _gravityFieldVectors.Select(ConvertFieldToJsObject).ToArray() : null,
-            MagneticFieldData = _showMagneticField ? _magneticFieldVectors.Select(ConvertFieldToJsObject).ToArray() : null
+            MagneticFieldData = _showMagneticField ? _magneticFieldVectors.Select(ConvertFieldToJsObject).ToArray() : null,
+            MiddleSliceOfFieldVectors = Get2DMiddleSliceOfFieldVectors().Select(ConvertFieldToJsObject).ToArray()
         };
     }
 
@@ -323,7 +324,7 @@ public class MagneticSimulationManager
                 ProfilingExtensions.RunWithClockingLog(UpdateMagnetsPositionsUsingMultipleDipoleApproximation);
                 break;
             case SimulationMode.DipoleApproximation:
-                ProfilingExtensions.RunWithClockingLog(UpdateMagnetPositionsUsingDipoleApproximation);
+                ProfilingExtensions.RunWithClockingLog(UpdateMagnetsPositionsUsingDipoleApproximation);
                 break;
             case SimulationMode.VoxelBased:
                 ProfilingExtensions.RunWithClockingLog(UpdateMagnetsPositionsUsingVoxelApproximation);
@@ -360,18 +361,22 @@ public class MagneticSimulationManager
         }
     }
 
-    private void UpdateMagnetPositionsUsingDipoleApproximation()
+    private void UpdateMagnetsPositionsUsingDipoleApproximation()
     {
         foreach (var target in _magnets.Where(m => !m.IsFixed))
         {
-            UpdateMagnetFromBepuSimulation(target);
-
             var totalForce = Vector3.Zero;
+            var totalTorque = Vector3.Zero;
 
             foreach (var source in _magnets.Where(m => m != target))
             {
                 Vector3 forceFromSource = CalculateDipoleDipoleForce(target, source);
                 totalForce += forceFromSource;
+
+                Vector3 fieldAtTarget = source.CalculateMagneticFieldAtPoint(target.Position);
+
+                Vector3 torqueOnTarget = target.CalculateTorque(fieldAtTarget);
+                totalTorque += torqueOnTarget;
             }
 
             var gravityForce = _gravity * target.Mass;
@@ -379,7 +384,26 @@ public class MagneticSimulationManager
             var acceleration = totalForce / target.Mass;
             target.Velocity += acceleration * _timeStep;
             target.Position += target.Velocity * _timeStep;
+
+            target.UpdateAngularVelocity(totalTorque, _timeStep);
+            target.UpdateOrientation(_timeStep);
         }
+    }
+
+    public List<FieldVector> Get2DMiddleSliceOfFieldVectors()
+    {
+        var middleY = _simulationExtents.Y / 2;
+        var sliceFieldVectors = new List<FieldVector>();
+
+        var closestY = _magneticFieldVectors?
+            .MinBy(vector => Math.Abs(vector.Position.Y - middleY))
+            ?.Position.Y;
+
+        if (_magneticFieldVectors != null)
+            sliceFieldVectors.AddRange(_magneticFieldVectors
+                .Where(vector => Math.Abs((float)(vector.Position.Y - closestY)) < 1e-6));
+
+        return sliceFieldVectors;
     }
 
     private void UpdateMagnetsPositionsUsingVoxelApproximation()
@@ -390,8 +414,6 @@ public class MagneticSimulationManager
 
             foreach (var sourceMagnet in _magnets.Where(m => m != targetMagnet))
             {
-                UpdateMagnetFromBepuSimulation(targetMagnet);
-
                 foreach (var targetVoxel in targetMagnet.VoxelsForApproximation)
                 {
                     Vector3 voxelForce = Vector3.Zero;
@@ -484,6 +506,7 @@ public class MagneticSimulationManager
                     bodyReference2.ApplyLinearImpulse(-forceOnMagnet1 * _timeStep);
                 }
             }
+            UpdateMagnetFromBepuSimulation(_magnets[i]);
         }
     }
 

@@ -6,4 +6,5 @@ public class SimulationStateForVisualization
     public object[]? Magnets { get; set; }
     public object[]? GravityFieldData { get; set; }
     public object[]? MagneticFieldData { get; set; }
+    public object[]? MiddleSliceOfFieldVectors { get; set; }
 }
