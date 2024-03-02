@@ -1,4 +1,4 @@
-﻿import { updateThreeJsScene, initializeThreeJs } from './index';
+﻿import { updateThreeJsScene, initializeThreeJs } from './initScene';
 
 window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) {
