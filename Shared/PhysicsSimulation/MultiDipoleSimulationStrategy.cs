@@ -1,9 +1,10 @@
+using Animations.Shared.Contracts;
 using Animations.Shared.Models;
 using System.Numerics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Simulation;
 
-public class SingleDipoleSimulationStrategy : ISimulationStrategy
+public class MultiDipoleSimulationStrategy : ISimulationStrategy
 {
     public void UpdateMagnetsPositions(List<Magnet> magnets, Vector3 gravity, float timeStep)
     {
@@ -14,23 +15,17 @@ public class SingleDipoleSimulationStrategy : ISimulationStrategy
 
             foreach (var source in magnets.Where(m => m != target))
             {
-                Vector3 forceFromSource = FieldCalculator.CalculateDipoleDipoleForce(target, source);
-                totalForce += forceFromSource;
-
-                Vector3 fieldAtTarget = source.CalculateMagneticFieldAtPoint(target.Position);
-
-                Vector3 torqueOnTarget = target.CalculateTorque(fieldAtTarget);
-                totalTorque += torqueOnTarget;
+                totalForce += source.ComputeForceOnMagnet(target);
+                totalTorque += source.ComputeTorque(target);
             }
 
             var gravityForce = gravity * target.Mass;
             totalForce += gravityForce;
             var acceleration = totalForce / target.Mass;
-            target.Velocity += acceleration * timeStep;
-            target.Position += target.Velocity * timeStep;
 
             target.UpdateAngularVelocity(totalTorque, timeStep);
-            target.UpdateOrientation(timeStep);
+            target.Velocity += acceleration * timeStep;
+            target.UpdatePositionAndAngularPosition(timeStep);
         }
     }
 }

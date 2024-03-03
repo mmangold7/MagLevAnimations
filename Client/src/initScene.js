@@ -39,13 +39,14 @@ function initializeThreeJs(inputDimensions, drawingParameters) {
     //addSpectrumStripe(scene, visibleSpectrumTexture, 0);
     const solarSpectrumTexture = generateSolarSpectrumTexture();
     addSpectrumStripe(scene, solarSpectrumTexture, 0);
-    drawElementSpectra(scene, fontLoader);
+    const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+    drawElementSpectra(scene, fontLoader, maxAnisotropy);
 
     digitalClock = addDigitalClock(scene, fontLoader);
     analogClock = addAnalogClock(scene);
 
     simulationGroup = new three.Group();
-    addSimulationBox(simulationGroup, halfBoundingBoxHeight, inputDimensions);
+    addSimulationBox(simulationGroup, halfBoundingBoxHeight, inputDimensions, fontLoader);
     simulationGroup.position.set(0, 20.5 + 0.5, 0);
     scene.add(simulationGroup);
 

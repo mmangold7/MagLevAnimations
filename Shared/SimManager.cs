@@ -1,4 +1,3 @@
-using Animations.Shared.Enums;
 using Animations.Shared.Extensions;
 using Animations.Shared.Models;
 using Animations.Shared.Models.Parameters;
@@ -8,7 +7,7 @@ namespace Animations.Shared;
 
 public class SimManager
 {
-    private readonly PhysicsSimulator _physicsSimulator;
+    private readonly PhysicsSimulation.PhysicsSimulation _physicsSimulator;
 
     private List<FieldVector> _gravityFieldVectors = new();
     private List<FieldVector> _magneticFieldVectors = new();
@@ -17,7 +16,7 @@ public class SimManager
 
     public SimManager(SimulationParameters initialParameters)
     {
-        _physicsSimulator = new PhysicsSimulator(initialParameters.SimulationExtents);
+        _physicsSimulator = new PhysicsSimulation.PhysicsSimulation(initialParameters.SimulationExtents);
         _physicsSimulator.UpdateParameters(initialParameters);
     }
 
@@ -36,12 +35,12 @@ public class SimManager
 
     public void RecalculateFields(SimulationParameters parameters)
     {
-        if (parameters.ShowGravityField) ProfilingExtensions.RunWithClockingLog(
-            () => _gravityFieldVectors = FieldCalculator.CalculateGravityField(
+        if (parameters.ShowGravityField) Profiling.RunWithClockingLog(
+            () => _gravityFieldVectors = Fields.CalculateGravityField(
                 parameters.Gravity, _previousGravityFieldVectors, parameters.SimulationExtents, parameters.Divisions));
 
-        if (parameters.ShowMagneticField) ProfilingExtensions.RunWithClockingLog(
-            () => _magneticFieldVectors = FieldCalculator.CalculateMagneticField(
+        if (parameters.ShowMagneticField) Profiling.RunWithClockingLog(
+            () => _magneticFieldVectors = Fields.CalculateMagneticField(
                 _physicsSimulator.Magnets, parameters.SimulationMode, _previousMagneticFieldVectors, parameters.SimulationExtents, parameters.Divisions));
     }
 

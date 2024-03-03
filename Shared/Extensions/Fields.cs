@@ -1,14 +1,13 @@
 using Animations.Shared.Enums;
-using Animations.Shared.Extensions;
 using Animations.Shared.Models;
 using System.Numerics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Extensions;
 
-public static class FieldCalculator
+public static class Fields
 {
     public static List<FieldVector> CalculateGravityField(
-        Vector3 gravity, 
+        Vector3 gravity,
         Dictionary<int, FieldVector> previousGravityFieldVectors,
         Vector3 simulationExtents,
         int divisions)
@@ -144,7 +143,7 @@ public static class FieldCalculator
     {
         var range = max - min;
         if (range == 0) return minScale;
-        return (value - min) / (range) * (maxScale - minScale) + minScale;
+        return (value - min) / range * (maxScale - minScale) + minScale;
     }
 
     private static Vector3 CalculatePositionInSimulationSpace(int x, int y, int z, float stepSize, Vector3 simulationExtents)
@@ -152,9 +151,9 @@ public static class FieldCalculator
         var offset = stepSize / 2.0f;
 
         return new Vector3(
-            (x * stepSize + offset) - (simulationExtents.X / 2.0f),
-            (y * stepSize + offset) - (simulationExtents.Y / 2.0f),
-            (z * stepSize + offset) - (simulationExtents.Z / 2.0f)
+            x * stepSize + offset - simulationExtents.X / 2.0f,
+            y * stepSize + offset - simulationExtents.Y / 2.0f,
+            z * stepSize + offset - simulationExtents.Z / 2.0f
         );
     }
 
@@ -165,14 +164,14 @@ public static class FieldCalculator
         Vector3 rHat = r / rMagnitude;
 
         float mu0 = 4 * (float)Math.PI * 1e-1f;
-        float prefactor = (3 * mu0) / (4 * (float)Math.PI * (float)Math.Pow(rMagnitude, 4));
+        float prefactor = 3 * mu0 / (4 * (float)Math.PI * (float)Math.Pow(rMagnitude, 4));
 
         float m1DotR = Vector3.Dot(source.Magnetization, rHat);
         float m2DotR = Vector3.Dot(target.Magnetization, rHat);
         float m1DotM2 = Vector3.Dot(source.Magnetization, target.Magnetization);
 
-        Vector3 term1 = (m2DotR * source.Magnetization);
-        Vector3 term2 = (m1DotR * target.Magnetization);
+        Vector3 term1 = m2DotR * source.Magnetization;
+        Vector3 term2 = m1DotR * target.Magnetization;
         Vector3 term3 = m1DotM2 * rHat;
         Vector3 term4 = -5 * (m1DotR * m2DotR / (float)Math.Pow(rMagnitude, 2)) * rHat;
 
@@ -191,11 +190,11 @@ public static class FieldCalculator
 
         if (rMagnitude == 0) return Vector3.Zero;
 
-        Vector3 force = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+        Vector3 force = mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude) *
                         (3 * (Vector3.Dot(sourceVoxel.Magnetization, r) * targetVoxel.Magnetization) +
                          3 * (Vector3.Dot(targetVoxel.Magnetization, r) * sourceVoxel.Magnetization) -
                          5 * Vector3.Dot(sourceVoxel.Magnetization, targetVoxel.Magnetization) * r / rMagnitude) -
-                        (mu0 / (3 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) * m1 * m2 * r;
+                        mu0 / (3 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude) * m1 * m2 * r;
 
         return force;
     }
@@ -208,7 +207,7 @@ public static class FieldCalculator
 
         if (rMagnitude == 0) return Vector3.Zero;
 
-        return (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+        return mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude) *
                (3 * Vector3.Dot(sourceMagnet.Magnetization, r) * r -
                 sourceMagnet.Magnetization * rMagnitude * rMagnitude);
     }
@@ -221,9 +220,44 @@ public static class FieldCalculator
 
         if (rMagnitude == 0) return Vector3.Zero;
 
-        var field = (mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude)) *
+        var field = mu0 / (4 * (float)Math.PI * rMagnitude * rMagnitude * rMagnitude) *
                     (3 * Vector3.Dot(voxel.Magnetization, r) * r - voxel.Magnetization * rMagnitude * rMagnitude);
 
         return field;
+    }
+
+    public static Matrix4x4 ToMatrix(this Quaternion quaternion)
+    {
+        return Matrix4x4.CreateFromQuaternion(quaternion);
+    }
+
+    public static float ShortestDistanceBetweenLines(Vector3 line1Start, Vector3 line1End, Vector3 line2Start, Vector3 line2End)
+    {
+        Vector3 u = line1End - line1Start;
+        Vector3 v = line2End - line2Start;
+        Vector3 w = line1Start - line2Start;
+
+        float a = Vector3.Dot(u, u);
+        float b = Vector3.Dot(u, v);
+        float c = Vector3.Dot(v, v);
+        float d = Vector3.Dot(u, w);
+        float e = Vector3.Dot(v, w);
+
+        float denominator = a * c - b * b;
+        float sc, tc;
+
+        if (denominator < float.Epsilon)
+        {
+            sc = 0.0f;
+            tc = (b > c ? d / b : e / c);
+        }
+        else
+        {
+            sc = (b * e - c * d) / denominator;
+            tc = (a * e - b * d) / denominator;
+        }
+
+        Vector3 dP = w + (sc * u) - (tc * v);
+        return dP.Length();
     }
 }

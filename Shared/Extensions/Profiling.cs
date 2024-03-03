@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Animations.Shared.Extensions;
 
-public static class ProfilingExtensions
+public static class Profiling
 {
     // shell command for exposing api to network: "npx iisexpress-proxy https://localhost:7223 to 3000"
 

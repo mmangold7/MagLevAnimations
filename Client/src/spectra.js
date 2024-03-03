@@ -27,17 +27,17 @@ function addSpectrumStripe(scene, texture, stripeIndex) {
     scene.add(plane);
 }
 
-function drawElementSpectra(scene, fontLoader) {
+function drawElementSpectra(scene, fontLoader, maxAnisotropy) {
     elementSpectra.forEach((element, index) => {
         const column = index % numColumns;
         const row = Math.floor(index / numColumns);
         if (row < numRows) {
-            addElementSpectrumStripe(scene, fontLoader, element, column, row);
+            addElementSpectrumStripe(scene, fontLoader, element, column, row, maxAnisotropy);
         }
     });
 }
 
-function addElementSpectrumStripe(scene, fontLoader, element, column, row) {
+function addElementSpectrumStripe(scene, fontLoader, element, column, row, maxAnisotropy) {
     const xOffset = -wallWidth / 2 + cellWidth / 2;
     const yOffset = (wallHeight) - (bigStripeHeight / 2) - (bigStripeHeight);
 
@@ -45,7 +45,8 @@ function addElementSpectrumStripe(scene, fontLoader, element, column, row) {
     const yPos = yOffset + row * cellHeight;
 
     const geometry = new three.PlaneGeometry(littleStripeWidth, littleStripeHeight);
-    const texture = generateElementSpectrumTexture(element);
+    const texture = generateElementSpectrumTexture(element, maxAnisotropy);
+    texture.minFilter = three.LinearFilter;
     const material = new three.MeshBasicMaterial({ map: texture, side: three.DoubleSide });
     const plane = new three.Mesh(geometry, material);
     plane.position.set(xPos, yPos - labelHeight / 2, -99.9);
@@ -104,8 +105,8 @@ function generateSolarSpectrumTexture() {
     return texture;
 }
 
-function generateElementSpectrumTexture(element) {
-    const width = 512;
+function generateElementSpectrumTexture(element, maxAnisotropy) {
+    const width = 1024;
     const height = 1;
     const size = width * height;
     const data = new Uint8Array(4 * size);
@@ -137,6 +138,7 @@ function generateElementSpectrumTexture(element) {
 
     const texture = new three.DataTexture(data, width, height, three.RGBAFormat);
     texture.needsUpdate = true;
+    texture.anisotropy = maxAnisotropy;
     return texture;
 }
 

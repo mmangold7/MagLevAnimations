@@ -198,7 +198,7 @@ public partial class Index : ComponentBase
         if (DebugMode)
             DebugInformation = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
         else if (_isVisualizationInitialized)
-            await ProfilingExtensions.RunWithClockingLogAsync(
+            await Profiling.RunWithClockingLogAsync(
                 () => JsRuntime.InvokeVoidAsync(
                     "Animations.updateThreeJsScene",
                     state,

@@ -1,7 +1,7 @@
 using Animations.Shared.Models;
 using System.Numerics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Contracts;
 
 public interface ISimulationStrategy
 {

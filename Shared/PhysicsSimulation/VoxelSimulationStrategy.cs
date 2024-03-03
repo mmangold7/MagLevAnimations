@@ -1,7 +1,9 @@
+using Animations.Shared.Contracts;
+using Animations.Shared.Extensions;
 using Animations.Shared.Models;
 using System.Numerics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Simulation;
 
 public class VoxelSimulationStrategy : ISimulationStrategy
 {
@@ -18,7 +20,7 @@ public class VoxelSimulationStrategy : ISimulationStrategy
                     var voxelForce = Vector3.Zero;
 
                     foreach (var sourceVoxel in sourceMagnet.Voxels)
-                        voxelForce += FieldCalculator.CalculateDipoleDipoleForce(targetVoxel, sourceVoxel);
+                        voxelForce += Fields.CalculateDipoleDipoleForce(targetVoxel, sourceVoxel);
 
                     totalForce += voxelForce;
                 }

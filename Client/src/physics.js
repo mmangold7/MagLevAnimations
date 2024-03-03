@@ -1,4 +1,5 @@
 ﻿import * as three from 'three';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
 function createCylinderMagnet(simulationGroup, halfBoundingBoxHeight, magnet) {
     const geometry = new three.CylinderGeometry(magnet.radius, magnet.radius, magnet.length, 32);
@@ -57,7 +58,7 @@ function createLoopsMagnet(simulationGroup, magnet) {
     }
 }
 
-function addSimulationBox(simulationGroup, halfBoundingBoxHeight, dimensions) {
+function addSimulationBox(simulationGroup, halfBoundingBoxHeight, dimensions, fontLoader) {
     const geometry = new three.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
     const edges = new three.EdgesGeometry(geometry);
     const line = new three.LineSegments(edges, new three.LineBasicMaterial({ color: 0xffffff }));
@@ -70,9 +71,34 @@ function addSimulationBox(simulationGroup, halfBoundingBoxHeight, dimensions) {
     gridHelper.position.set(0, 0.1, 0);
     simulationGroup.add(gridHelper);
 
-    const axesHelper = new three.AxesHelper(1);
+    const axesHelper = new three.AxesHelper(10);
     axesHelper.position.set(-dimensions.width / 2 + 0.1, 0.2, -dimensions.depth / 2 + 0.1);
     simulationGroup.add(axesHelper);
+
+    // Load a font and add text labels for each axis
+    fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+        const axes = ['X', 'Y', 'Z'];
+        const axisPositions = [
+            new three.Vector3(11, 0, 0), // X
+            new three.Vector3(0, 11, 0), // Y
+            new three.Vector3(0, 0, 11)  // Z
+        ];
+        const colors = [0xff0000, 0x00ff00, 0x0000ff]; // Red for X, Green for Y, Blue for Z
+
+        axes.forEach((axis, index) => {
+            const textGeometry = new TextGeometry(axis, {
+                font: font,
+                size: 0.5,
+                height: 0.1,
+            });
+
+            const textMaterial = new three.MeshBasicMaterial({ color: colors[index] });
+            const textMesh = new three.Mesh(textGeometry, textMaterial);
+
+            textMesh.position.copy(axisPositions[index]);
+            simulationGroup.add(textMesh);
+        });
+    });
 }
 
 function drawFieldVectors(simulationGroup, halfBoundingBoxHeight, fieldData, color, fieldDrawMethod, fieldType) {

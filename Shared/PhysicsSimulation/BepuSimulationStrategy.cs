@@ -1,3 +1,5 @@
+using Animations.Shared.Contracts;
+using Animations.Shared.Extensions;
 using Animations.Shared.Models;
 using BepuPhysics;
 using BepuPhysics.Collidables;
@@ -7,11 +9,11 @@ using BepuUtilities;
 using BepuUtilities.Memory;
 using System.Numerics;
 
-namespace Animations.Shared;
+namespace Animations.Shared.Simulation;
 
 public class BepuSimulationStrategy : ISimulationStrategy
 {
-    private Simulation _bepuSimulator;
+    private BepuPhysics.Simulation _bepuSimulator;
 
     public BepuSimulationStrategy(Vector3 gravity) => _bepuSimulator = CreateBepuPhysicsSimulator(gravity);
 
@@ -33,7 +35,7 @@ public class BepuSimulationStrategy : ISimulationStrategy
                 var bodyReference1 = _bepuSimulator.Bodies.GetBodyReference(magnet1.PhysicsEngineBodyHandle);
                 var bodyReference2 = _bepuSimulator.Bodies.GetBodyReference(magnet2.PhysicsEngineBodyHandle);
 
-                var forceOnMagnet1 = FieldCalculator.CalculateDipoleDipoleForce(magnet1, magnet2);
+                var forceOnMagnet1 = Fields.CalculateDipoleDipoleForce(magnet1, magnet2);
                 bodyReference1.ApplyLinearImpulse(forceOnMagnet1 * timeStep);
                 bodyReference2.ApplyLinearImpulse(-forceOnMagnet1 * timeStep);
             }
@@ -49,8 +51,8 @@ public class BepuSimulationStrategy : ISimulationStrategy
         targetMagnet.Orientation = bodyReference.Pose.Orientation;
     }
 
-    public static Simulation CreateBepuPhysicsSimulator(Vector3 gravity) =>
-        Simulation.Create(
+    public static BepuPhysics.Simulation CreateBepuPhysicsSimulator(Vector3 gravity) =>
+        BepuPhysics.Simulation.Create(
             new BufferPool(),
             new BepuNarrowPhaseCallbacks(),
             new BepuPoseIntegratorCallbacks(gravity),
@@ -60,7 +62,7 @@ public class BepuSimulationStrategy : ISimulationStrategy
     public void AddAllMagnetsToBepuPhysicsSimulator(List<Magnet> magnets)
     {
         foreach (var magnet in magnets) AddMagnetToBepuSimulator(magnet);
-        
+
     }
 
     private void AddMagnetToBepuSimulator(Magnet magnet)
@@ -81,7 +83,7 @@ public class BepuSimulationStrategy : ISimulationStrategy
 
     public struct BepuNarrowPhaseCallbacks : INarrowPhaseCallbacks
     {
-        public void Initialize(Simulation simulation) { }
+        public void Initialize(BepuPhysics.Simulation simulation) { }
 
         public bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b, ref float speculativeMargin) => true;
 
@@ -115,10 +117,10 @@ public class BepuSimulationStrategy : ISimulationStrategy
 
         public BepuPoseIntegratorCallbacks(Vector3 gravity)
         {
-            this._gravity = gravity;
+            _gravity = gravity;
         }
 
-        public void Initialize(Simulation simulation) { }
+        public void Initialize(BepuPhysics.Simulation simulation) { }
 
         public void PrepareForIntegration(float dt) { }
 
