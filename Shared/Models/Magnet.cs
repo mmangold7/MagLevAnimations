@@ -21,7 +21,7 @@ public class Magnet
     public Quaternion Orientation { get; set; }
     public MagnetType Type { get; set; }
     public BodyHandle PhysicsEngineBodyHandle { get; set; }
-    public List<Voxel> VoxelsForApproximation { get; set; } = new();
+    public List<Voxel> Voxels { get; set; } = new();
 
     public Magnet(
         Vector3 position,

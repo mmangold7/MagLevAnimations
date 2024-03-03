@@ -14,7 +14,7 @@ public partial class Index : ComponentBase
     private bool _isVisualizationInitialized;
     private DateTime _lastFrameTime = DateTime.UtcNow;
     private CancellationTokenSource _simLoopCancel = new();
-    private MagneticSimulationManager? _simulationManager;
+    private SimManager? _simulationManager;
 
     #region View-bound Properties
 
@@ -56,7 +56,7 @@ public partial class Index : ComponentBase
         ShowGravityField = !ShowGravityField;
         if (Paused)
         {
-            _simulationManager?.RecalculateFields();
+            _simulationManager?.RecalculateFields(GetSimulationParametersFromView());
             await UpdateClientVisualization();
         }
     }
@@ -66,7 +66,7 @@ public partial class Index : ComponentBase
         ShowMagneticField = !ShowMagneticField;
         if (Paused)
         {
-            _simulationManager?.RecalculateFields();
+            _simulationManager?.RecalculateFields(GetSimulationParametersFromView());
             await UpdateClientVisualization();
         }
     }
@@ -106,8 +106,7 @@ public partial class Index : ComponentBase
         FrameCount = 0;
         FrameRate = 0;
 
-        _simulationManager = new MagneticSimulationManager(GetSimulationParametersFromView());
-        _simulationManager.InitializeTwoMagnets();
+        _simulationManager = new SimManager(GetSimulationParametersFromView());
     }
 
     private void CancelSimulation()
@@ -124,7 +123,7 @@ public partial class Index : ComponentBase
             TimeStep = TimeStep,
             Gravity = new Vector3(0, Gravity, 0),
             SimulationExtents = new Vector3(SingleSimulationExtent, SingleSimulationExtent, SingleSimulationExtent),
-            Mode = Enum.Parse<SimulationMode>(SimulationModeString),
+            SimulationMode = Enum.Parse<SimulationMode>(SimulationModeString),
             Divisions = Divisions,
             VoxelsPerDivision = VoxelsPerDivision,
             ShowGravityField = ShowGravityField,
@@ -193,7 +192,7 @@ public partial class Index : ComponentBase
     {
         if (_simulationManager == null) return;
 
-        var state = _simulationManager.GetSimulationState();
+        var state = _simulationManager.GetSimulationState(ShowGravityField, ShowMagneticField);
         state.TimeSinceStart = FrameCount * TimeStep;
 
         if (DebugMode)

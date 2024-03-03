@@ -28,7 +28,7 @@ function addDigitalClock(scene, fontLoader) {
         mesh.position.set(-99.5, 40 - 1.25 - 10, -(40 - 1.25));
         scene.add(mesh);
 
-        digitalClock.updateTime = function (simulationTime) {upda
+        digitalClock.updateTime = function (simulationTime) {
             const time = new Date(simulationTime * 1000);
 
             let hours = time.getUTCHours();
