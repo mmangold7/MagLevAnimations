@@ -1,11 +1,10 @@
-﻿using Animations.Shared;
-using Animations.Shared.Enums;
-using Animations.Shared.Extensions;
-using Animations.Shared.Models.Parameters;
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Numerics;
 using System.Text.Json;
+using Animations.Client.Enums;
+using Animations.Client.Extensions;
+using Animations.Client.Models.Parameters;
 
 namespace Animations.Client.Pages;
 
