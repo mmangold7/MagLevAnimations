@@ -1,5 +1,5 @@
 using System.Numerics;
-using Animations.Client.Enums;
+using Animations.Client.Models.Enums;
 
 namespace Animations.Client.Models.Parameters;
 

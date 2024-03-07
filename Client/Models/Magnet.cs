@@ -1,6 +1,6 @@
 using System.Numerics;
-using Animations.Client.Enums;
 using Animations.Client.Extensions;
+using Animations.Client.Models.Enums;
 using BepuPhysics;
 
 namespace Animations.Client.Models;
@@ -74,6 +74,11 @@ public class Magnet
         );
 
         Orientation = Quaternion.Normalize(Orientation);
+
+        var rotationMatrix = Matrix4x4.CreateFromQuaternion(Orientation);
+        var rotatedMagnetizationDirection = Vector3.Transform(Magnetization, rotationMatrix);
+        var originalMagnitude = Magnetization.Length();
+        Magnetization = Vector3.Normalize(rotatedMagnetizationDirection) * originalMagnitude;
     }
 
     public Vector3 ComputeMultipleDipoleFieldAtPoint(Vector3 point)
@@ -116,7 +121,7 @@ public class Magnet
     private static Vector3 CalculateSingleDipoleFieldAtPoint(Vector3 dipolePosition, Vector3 dipoleMagnetization, Vector3 point)
     {
         Vector3 r = point - dipolePosition;
-        var mu0 = 4 * (float)Math.PI * 1e-7f;
+        var mu0 = 4 * (float)Math.PI * 1e-1f;
         var rMagnitude = r.Length();
 
         if (rMagnitude == 0) return Vector3.Zero;

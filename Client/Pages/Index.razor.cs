@@ -2,9 +2,9 @@
 using Microsoft.JSInterop;
 using System.Numerics;
 using System.Text.Json;
-using Animations.Client.Enums;
 using Animations.Client.Extensions;
 using Animations.Client.Models.Parameters;
+using Animations.Client.Models.Enums;
 
 namespace Animations.Client.Pages;
 

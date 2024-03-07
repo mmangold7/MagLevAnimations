@@ -1,4 +1,4 @@
-namespace Animations.Client.Enums;
+namespace Animations.Client.Models.Enums;
 
 public enum SimulationMode
 {

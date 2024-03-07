@@ -20,7 +20,7 @@ public class VoxelSimulationStrategy : ISimulationStrategy
                     var voxelForce = Vector3.Zero;
 
                     foreach (var sourceVoxel in sourceMagnet.Voxels)
-                        voxelForce += Fields.CalculateDipoleDipoleForce(targetVoxel, sourceVoxel);
+                        voxelForce += Fields.CalculateDipoleDipoleForceVoxel(targetVoxel, sourceVoxel);
 
                     totalForce += voxelForce;
                 }

@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Animations.Server", "Server\Animations.Server.csproj", "{2EDA4C80-6557-47C6-B982-9D9972E2CAB2}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Animations.Client", "Client\Animations.Client.csproj", "{30105A14-DFA5-4F7C-9030-37C786B1DBB7}"
 EndProject
 Global
@@ -13,10 +11,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2EDA4C80-6557-47C6-B982-9D9972E2CAB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2EDA4C80-6557-47C6-B982-9D9972E2CAB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2EDA4C80-6557-47C6-B982-9D9972E2CAB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2EDA4C80-6557-47C6-B982-9D9972E2CAB2}.Release|Any CPU.Build.0 = Release|Any CPU
 		{30105A14-DFA5-4F7C-9030-37C786B1DBB7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{30105A14-DFA5-4F7C-9030-37C786B1DBB7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30105A14-DFA5-4F7C-9030-37C786B1DBB7}.Release|Any CPU.ActiveCfg = Release|Any CPU

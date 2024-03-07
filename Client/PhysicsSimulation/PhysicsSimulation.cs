@@ -1,8 +1,8 @@
 using System.Numerics;
 using Animations.Client.Contracts;
-using Animations.Client.Enums;
 using Animations.Client.Extensions;
 using Animations.Client.Models;
+using Animations.Client.Models.Enums;
 using Animations.Client.Models.Parameters;
 
 namespace Animations.Client.PhysicsSimulation;
@@ -87,7 +87,7 @@ public class PhysicsSimulation
         {
             SimulationMode.Bepu => new BepuSimulationStrategy(_gravity),
             SimulationMode.DipoleApproximation => new SingleDipoleSimulationStrategy(),
-            SimulationMode.MultipleDipoles => new MultiDipoleSimulationStrategy(),
+            //SimulationMode.MultipleDipoles => new MultiDipoleSimulationStrategy(),
             SimulationMode.VoxelBased => new VoxelSimulationStrategy(),
             _ => throw new ArgumentOutOfRangeException()
         };

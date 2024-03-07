@@ -9,10 +9,11 @@ public class SimManager
 {
     private readonly PhysicsSimulation.PhysicsSimulation _physicsSimulator;
 
+    private readonly Dictionary<int, FieldVector> _previousGravityFieldVectors = new();
+    private readonly Dictionary<int, FieldVector> _previousMagneticFieldVectors = new();
+
     private List<FieldVector> _gravityFieldVectors = new();
     private List<FieldVector> _magneticFieldVectors = new();
-    private readonly Dictionary<int, FieldVector> _previousMagneticFieldVectors = new();
-    private readonly Dictionary<int, FieldVector> _previousGravityFieldVectors = new();
 
     public SimManager(SimulationParameters initialParameters)
     {

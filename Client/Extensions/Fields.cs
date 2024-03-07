@@ -1,6 +1,6 @@
 using System.Numerics;
-using Animations.Client.Enums;
 using Animations.Client.Models;
+using Animations.Client.Models.Enums;
 
 namespace Animations.Client.Extensions;
 
@@ -180,10 +180,10 @@ public static class Fields
         return force;
     }
 
-    public static Vector3 CalculateDipoleDipoleForce(Voxel targetVoxel, Voxel sourceVoxel)
+    public static Vector3 CalculateDipoleDipoleForceVoxel(Voxel targetVoxel, Voxel sourceVoxel)
     {
         Vector3 r = targetVoxel.Position - sourceVoxel.Position;
-        float mu0 = 4 * (float)Math.PI * 1e-7f;
+        float mu0 = 4 * (float)Math.PI * 1e-1f;
         float m1 = sourceVoxel.Magnetization.Length() * sourceVoxel.Volume;
         float m2 = targetVoxel.Magnetization.Length() * targetVoxel.Volume;
         float rMagnitude = r.Length();
@@ -202,7 +202,7 @@ public static class Fields
     public static Vector3 CalculateSingleDipoleFieldAtPoint(Magnet sourceMagnet, Vector3 point)
     {
         var r = point - sourceMagnet.Position;
-        var mu0 = 4 * (float)Math.PI * 1e-7f;
+        var mu0 = 4 * (float)Math.PI * 1e-1f;
         var rMagnitude = r.Length();
 
         if (rMagnitude == 0) return Vector3.Zero;
@@ -215,7 +215,7 @@ public static class Fields
     public static Vector3 CalculateFieldFromVoxel(Voxel voxel, Vector3 point)
     {
         var r = point - voxel.Position;
-        var mu0 = 4 * (float)Math.PI * 1e-7f;
+        var mu0 = 4 * (float)Math.PI * 1e-1f;
         var rMagnitude = r.Length();
 
         if (rMagnitude == 0) return Vector3.Zero;
